@@ -380,7 +380,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Default Fallback matching for CEO Admin or Employee
-    if (cleanId === 'admin@bahupetroleum.com' || cleanId === '03009654471' || cleanId === 'admin') {
+    if (cleanId === '03009654471' || cleanId === '03129654471' || cleanId === 'admin') {
       setCurrentUser(initialUsers[0]);
       return true;
     }
@@ -397,7 +397,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (matched) {
       setCurrentUser(matched);
     } else {
-      setCurrentUser(role === 'ADMIN' ? initialUsers[0] : { id: 'u-emp-1', name: 'Employee', email: 'emp@bahupetroleum.com', role: 'EMPLOYEE', active: true, createdAt: new Date().toISOString() });
+      setCurrentUser(role === 'ADMIN' ? initialUsers[0] : { id: 'u-emp-1', name: 'Employee', email: '', role: 'EMPLOYEE', active: true, createdAt: new Date().toISOString() });
     }
   };
 
@@ -435,7 +435,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newEmp: User = {
       id: `u-emp-${Date.now()}`,
       name: data.name,
-      email: `${data.name.toLowerCase().replace(/\s+/g, '')}@bahupetroleum.com`,
+      email: '',
       password: data.password || '123456',
       role: 'EMPLOYEE',
       active: true,

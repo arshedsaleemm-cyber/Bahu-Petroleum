@@ -37,7 +37,7 @@ export const SettingsView: React.FC = () => {
 
   // Admin Profile form states
   const [adminName, setAdminName] = useState(adminUser?.name || 'Mian Rashid Saleem');
-  const [adminEmail, setAdminEmail] = useState(adminUser?.email || 'admin@bahupetroleum.com');
+  const [adminEmail, setAdminEmail] = useState(adminUser?.email || '');
   const [phonePrimary, setPhonePrimary] = useState(adminUser?.phonePrimary || '03009654471');
   const [phoneSecondary, setPhoneSecondary] = useState(adminUser?.phoneSecondary || '03129654471');
   const [adminPassword, setAdminPassword] = useState('');

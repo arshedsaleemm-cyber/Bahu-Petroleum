@@ -8,7 +8,7 @@ export const LoginView: React.FC = () => {
   const [loginRole, setLoginRole] = useState<'ADMIN' | 'EMPLOYEE'>('ADMIN');
   
   // Admin login states
-  const [adminIdentifier, setAdminIdentifier] = useState('admin@bahupetroleum.com'); // email or 03009654471
+  const [adminIdentifier, setAdminIdentifier] = useState('03009654471'); // phone or username
   const [adminPassword, setAdminPassword] = useState('admin');
 
   // Employee login states
@@ -128,16 +128,16 @@ export const LoginView: React.FC = () => {
             <form onSubmit={handleAdminSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Admin Email or Primary Phone
+                  Admin Mobile Number or Username
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                   <input
                     type="text"
                     value={adminIdentifier}
                     onChange={e => setAdminIdentifier(e.target.value)}
                     required
-                    placeholder="admin@bahupetroleum.com or 03009654471"
+                    placeholder="03009654471 or admin"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 text-xs sm:text-sm font-medium outline-none transition-all"
                   />
                 </div>
@@ -291,7 +291,6 @@ export const LoginView: React.FC = () => {
               <p className="font-bold text-slate-900">Admin Account Credentials:</p>
               <ul className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200 font-mono text-[11px]">
                 <li><span className="font-bold text-slate-500">Name:</span> Mian Rashid Saleem</li>
-                <li><span className="font-bold text-slate-500">Email:</span> admin@bahupetroleum.com</li>
                 <li><span className="font-bold text-slate-500">Primary Mobile:</span> 03009654471</li>
                 <li><span className="font-bold text-slate-500">Secondary Mobile:</span> 03129654471</li>
                 <li><span className="font-bold text-emerald-700">Default Password:</span> admin</li>
@@ -301,7 +300,7 @@ export const LoginView: React.FC = () => {
               </p>
               <button
                 onClick={() => {
-                  setAdminIdentifier('admin@bahupetroleum.com');
+                  setAdminIdentifier('03009654471');
                   setAdminPassword('admin');
                   setIsForgotPasswordOpen(false);
                 }}

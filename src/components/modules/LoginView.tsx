@@ -8,8 +8,8 @@ export const LoginView: React.FC = () => {
   const [loginRole, setLoginRole] = useState<'ADMIN' | 'EMPLOYEE'>('ADMIN');
   
   // Admin login states
-  const [adminIdentifier, setAdminIdentifier] = useState('03009654471'); // phone or username
-  const [adminPassword, setAdminPassword] = useState('admin');
+  const [adminIdentifier, setAdminIdentifier] = useState(''); // phone or username
+  const [adminPassword, setAdminPassword] = useState('');
 
   // Employee login states
   const [employeeName, setEmployeeName] = useState('');

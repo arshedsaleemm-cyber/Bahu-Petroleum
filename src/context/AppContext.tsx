@@ -1057,23 +1057,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Test connection to Firestore on boot
   useEffect(() => {
-    testFirestoreConnection().catch(err => {
-      console.warn('Firestore initial connection test warning:', err);
-    });
+    testFirestoreConnection();
   }, []);
 
   const triggerManualSync = () => {
     setSyncStatus(prev => ({ ...prev, syncing: true }));
     testFirestoreConnection()
-      .then(() => {
+      .then(isOnline => {
         setSyncStatus({
-          online: true,
+          online: isOnline,
           lastSyncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           syncing: false,
         });
       })
-      .catch(err => {
-        console.error('Sync error:', err);
+      .catch(() => {
         setSyncStatus({
           online: false,
           lastSyncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

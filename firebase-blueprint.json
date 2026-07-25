@@ -1,0 +1,267 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account in Bahu Petroleum system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["ADMIN", "EMPLOYEE"] },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role", "active"]
+    },
+    "Tank": {
+      "title": "Tank",
+      "description": "Fuel tank storage status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tankName": { "type": "string", "maxLength": 100 },
+        "fuelType": { "type": "string", "enum": ["Petrol", "Diesel"] },
+        "capacity": { "type": "number" },
+        "currentFuel": { "type": "number" },
+        "openingStock": { "type": "number" },
+        "closingStock": { "type": "number" },
+        "dailyUsage": { "type": "number" },
+        "lowStockThreshold": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["id", "tankName", "fuelType", "capacity", "currentFuel"]
+    },
+    "FuelDelivery": {
+      "title": "FuelDelivery",
+      "description": "Fuel delivery tanker reception record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "deliveryDate": { "type": "string" },
+        "deliveryTime": { "type": "string" },
+        "fuelType": { "type": "string" },
+        "petrolLiters": { "type": "number" },
+        "dieselLiters": { "type": "number" },
+        "supplierName": { "type": "string", "maxLength": 100 },
+        "invoiceNumber": { "type": "string", "maxLength": 100 },
+        "totalLitersReceived": { "type": "number" },
+        "purchaseRatePetrol": { "type": "number" },
+        "purchaseRateDiesel": { "type": "number" },
+        "totalPurchaseAmount": { "type": "number" },
+        "tankId": { "type": "string" },
+        "tankName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "deliveryDate", "fuelType", "supplierName", "invoiceNumber", "totalPurchaseAmount"]
+    },
+    "LubricantProduct": {
+      "title": "LubricantProduct",
+      "description": "Lubricant stock item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productName": { "type": "string", "maxLength": 100 },
+        "brand": { "type": "string", "maxLength": 100 },
+        "category": { "type": "string" },
+        "barcode": { "type": "string" },
+        "purchasePrice": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "stockIn": { "type": "number" },
+        "stockOut": { "type": "number" },
+        "remainingStock": { "type": "number" },
+        "lowStockAlert": { "type": "number" }
+      },
+      "required": ["id", "productName", "brand", "category", "sellingPrice", "remainingStock"]
+    },
+    "Worker": {
+      "title": "Worker",
+      "description": "Employee worker details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "fatherName": { "type": "string", "maxLength": 100 },
+        "phoneNumber": { "type": "string" },
+        "cnic": { "type": "string" },
+        "address": { "type": "string" },
+        "designation": { "type": "string" },
+        "joiningDate": { "type": "string" },
+        "monthlySalary": { "type": "number" },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] }
+      },
+      "required": ["id", "name", "phoneNumber", "designation", "monthlySalary", "status"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Worker attendance entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workerId": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["Present", "Absent", "Leave", "Half Day"] },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "workerId", "date", "status"]
+    },
+    "UdhaarCustomer": {
+      "title": "UdhaarCustomer",
+      "description": "Credit customer ledger record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "phoneNumber": { "type": "string" },
+        "vehicleNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "creditLimit": { "type": "number" },
+        "totalCredit": { "type": "number" },
+        "paymentReceived": { "type": "number" },
+        "remainingBalance": { "type": "number" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "customerName", "phoneNumber", "remainingBalance"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Expense voucher record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string", "maxLength": 100 },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "description": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "title", "category", "amount", "date"]
+    },
+    "DailySalesEntry": {
+      "title": "DailySalesEntry",
+      "description": "Daily total sales entry for sub-business or cash/cards",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "section": {
+          "type": "string",
+          "enum": [
+            "Car Wash",
+            "Fast Food",
+            "Tyre Shop",
+            "Tuck Shop",
+            "Lubricants",
+            "Credit Card",
+            "Infinity Card",
+            "Daily Petrol Cash"
+          ]
+        },
+        "totalSales": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "date", "section", "totalSales"]
+    },
+    "BankAccount": {
+      "title": "BankAccount",
+      "description": "Bank account record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "accountTitle": { "type": "string" },
+        "currentBalance": { "type": "number" }
+      },
+      "required": ["id", "bankName", "accountNumber", "currentBalance"]
+    },
+    "BankTransaction": {
+      "title": "BankTransaction",
+      "description": "Bank transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "bankId": { "type": "string" },
+        "bankName": { "type": "string" },
+        "type": { "type": "string", "enum": ["Deposit", "Withdrawal", "Transfer"] },
+        "amount": { "type": "number" },
+        "referenceNumber": { "type": "string" },
+        "date": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "bankId", "type", "amount", "date"]
+    },
+    "RentalAgreement": {
+      "title": "RentalAgreement",
+      "description": "Rental shop tenant agreement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "shopName": { "type": "string" },
+        "tenantName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "monthlyRent": { "type": "number" },
+        "securityDeposit": { "type": "number" },
+        "amountPaid": { "type": "number" },
+        "pendingAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Paid", "Pending", "Overdue"] }
+      },
+      "required": ["id", "shopName", "tenantName", "monthlyRent", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/tanks/{tankId}": {
+      "schema": { "$ref": "#/entities/Tank" },
+      "description": "Fuel tanks"
+    },
+    "/deliveries/{deliveryId}": {
+      "schema": { "$ref": "#/entities/FuelDelivery" },
+      "description": "Fuel tanker deliveries"
+    },
+    "/lubricants/{lubricantId}": {
+      "schema": { "$ref": "#/entities/LubricantProduct" },
+      "description": "Lubricants inventory"
+    },
+    "/workers/{workerId}": {
+      "schema": { "$ref": "#/entities/Worker" },
+      "description": "Workers roster"
+    },
+    "/attendance/{attendanceId}": {
+      "schema": { "$ref": "#/entities/AttendanceRecord" },
+      "description": "Worker attendance records"
+    },
+    "/udhaarCustomers/{customerId}": {
+      "schema": { "$ref": "#/entities/UdhaarCustomer" },
+      "description": "Udhaar credit customers"
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Expense vouchers"
+    },
+    "/dailySalesEntries/{entryId}": {
+      "schema": { "$ref": "#/entities/DailySalesEntry" },
+      "description": "Daily total sales entries"
+    },
+    "/bankAccounts/{accountId}": {
+      "schema": { "$ref": "#/entities/BankAccount" },
+      "description": "Bank accounts"
+    },
+    "/bankTransactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/BankTransaction" },
+      "description": "Bank transactions"
+    },
+    "/rentals/{rentalId}": {
+      "schema": { "$ref": "#/entities/RentalAgreement" },
+      "description": "Rental agreements"
+    }
+  }
+}

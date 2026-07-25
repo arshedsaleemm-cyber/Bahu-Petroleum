@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { testFirestoreConnection } from '../lib/firebase';
 import {
   User,
   FuelDelivery,
@@ -1054,15 +1055,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.clear();
   };
 
+  // Test connection to Firestore on boot
+  useEffect(() => {
+    testFirestoreConnection().catch(err => {
+      console.warn('Firestore initial connection test warning:', err);
+    });
+  }, []);
+
   const triggerManualSync = () => {
     setSyncStatus(prev => ({ ...prev, syncing: true }));
-    setTimeout(() => {
-      setSyncStatus({
-        online: true,
-        lastSyncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        syncing: false,
+    testFirestoreConnection()
+      .then(() => {
+        setSyncStatus({
+          online: true,
+          lastSyncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          syncing: false,
+        });
+      })
+      .catch(err => {
+        console.error('Sync error:', err);
+        setSyncStatus({
+          online: false,
+          lastSyncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          syncing: false,
+        });
       });
-    }, 1000);
   };
 
   return (

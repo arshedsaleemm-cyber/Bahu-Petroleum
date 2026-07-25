@@ -1,0 +1,6 @@
+{
+  "name": "Bahu Petroleum Enterprise",
+  "description": "Enterprise Petrol Pump Management System for Bahu Petroleum, led by Founder & CEO Mian Rashid Saleem.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

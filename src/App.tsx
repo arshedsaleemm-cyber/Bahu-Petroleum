@@ -92,16 +92,16 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col antialiased selection:bg-red-500 selection:text-white">
+    <div className="min-h-screen bg-slate-100 flex flex-col antialiased selection:bg-red-500 selection:text-white max-w-full overflow-x-hidden">
       {/* Top Header */}
       <Header />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden w-full max-w-full">
         {/* Desktop Sidebar */}
         <Sidebar />
 
         {/* Main View Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full custom-scrollbar">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full max-w-full custom-scrollbar pb-20 md:pb-8 min-w-0">
           {renderModuleView()}
         </main>
       </div>

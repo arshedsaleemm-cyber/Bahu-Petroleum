@@ -64,11 +64,11 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Search & Status Bar */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Global Search Button */}
           <button
             onClick={() => setIsSearchOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-900/60 hover:bg-blue-900 text-blue-100 border border-blue-800 text-xs sm:text-sm font-medium transition-all"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-900/60 hover:bg-blue-900 text-blue-100 border border-blue-800 text-xs sm:text-sm font-medium transition-all"
             title="Global Search"
           >
             <Search className="w-4 h-4 text-blue-300" />
@@ -82,7 +82,7 @@ export const Header: React.FC = () => {
           <button
             onClick={triggerManualSync}
             disabled={syncStatus.syncing}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-900/40 hover:bg-blue-900/80 text-blue-200 border border-blue-800/80 text-xs transition-all"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-blue-900/40 hover:bg-blue-900/80 text-blue-200 border border-blue-800/80 text-xs transition-all"
             title="Cloud Sync Status - Click to sync"
           >
             {syncStatus.syncing ? (
@@ -105,33 +105,34 @@ export const Header: React.FC = () => {
           >
             <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full text-[10px] font-bold flex items-center justify-center animate-pulse border-2 border-blue-950">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white rounded-full text-[9px] font-bold flex items-center justify-center animate-pulse border-2 border-blue-950">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
 
           {/* User Role Switcher Quick Bar */}
-          <div className="flex items-center gap-1.5 bg-blue-900/80 p-1 rounded-xl border border-blue-800">
+          <div className="flex items-center gap-1 bg-blue-900/80 p-1 rounded-xl border border-blue-800">
             {currentUser?.role === 'ADMIN' ? (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-semibold shadow-sm">
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-600 text-white text-xs font-semibold shadow-sm">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">ADMIN</span>
+                <span className="hidden md:inline">ADMIN</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold shadow-sm">
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold shadow-sm">
                 <UserCheck className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">EMPLOYEE</span>
+                <span className="hidden md:inline">EMPLOYEE</span>
               </div>
             )}
 
-            {/* Switch Role Quick Dropdown Toggle for Demo / Testing */}
+            {/* Switch Role Quick Dropdown Toggle */}
             <button
               onClick={() => switchRole(currentUser?.role === 'ADMIN' ? 'EMPLOYEE' : 'ADMIN')}
-              className="px-2 py-1 text-[11px] text-blue-200 hover:text-white bg-blue-950 hover:bg-blue-800 rounded-lg font-medium transition-all"
+              className="px-1.5 py-1 text-[10px] sm:text-[11px] text-blue-200 hover:text-white bg-blue-950 hover:bg-blue-800 rounded-lg font-medium transition-all"
               title="Toggle Role for testing permissions"
             >
-              Switch to {currentUser?.role === 'ADMIN' ? 'Employee' : 'Admin'}
+              <span className="hidden sm:inline">Switch Role</span>
+              <span className="sm:hidden">↻</span>
             </button>
 
             {/* Logout */}

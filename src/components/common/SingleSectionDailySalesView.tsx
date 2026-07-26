@@ -337,12 +337,12 @@ export const SingleSectionDailySalesView: React.FC<SingleSectionDailySalesViewPr
         </div>
 
         {/* Time Period Filter */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
+        <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 max-w-full overflow-x-auto">
           {(['ALL', 'TODAY', 'WEEK', 'MONTH', 'YEAR'] as const).map(tp => (
             <button
               key={tp}
               onClick={() => setTimePeriod(tp)}
-              className={`px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase transition-all ${
+              className={`px-2.5 sm:px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase transition-all whitespace-nowrap ${
                 timePeriod === tp
                   ? 'bg-blue-900 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -356,7 +356,7 @@ export const SingleSectionDailySalesView: React.FC<SingleSectionDailySalesViewPr
 
       {/* Entries Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
+        <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-slate-600" />
             <h3 className="font-extrabold text-slate-900 text-sm">
@@ -383,7 +383,7 @@ export const SingleSectionDailySalesView: React.FC<SingleSectionDailySalesViewPr
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-container">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-600 uppercase text-[10px] font-black">
                 <tr>

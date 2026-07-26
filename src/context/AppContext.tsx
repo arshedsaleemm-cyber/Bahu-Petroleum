@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { testFirestoreConnection } from '../lib/firebase';
+import { simpleHashPassword, verifyPassword, generateOTP } from '../utils/security';
 import {
   subscribeToCollection,
   subscribeToDoc,
@@ -140,7 +141,9 @@ interface AppContextType {
   canManageUsers: boolean;
 
   // Actions
-  login: (identifier: string, pass: string, role?: UserRole) => boolean;
+  login: (identifier: string, pass: string, role?: UserRole, rememberDevice?: boolean) => boolean;
+  sendPasswordResetOTP: (identifier: string) => { success: boolean; message: string; otp?: string; user?: User };
+  resetUserPassword: (userId: string, newPass: string) => boolean;
   logout: () => void;
   switchRole: (role: UserRole) => void;
   updateAdminProfile: (data: { name: string; email: string; phonePrimary: string; phoneSecondary: string; password?: string }) => void;
@@ -224,15 +227,21 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'BAHU_PETROLEUM_ENTERPRISE_DB_V2';
+const TRUSTED_DEVICE_KEY = 'BAHU_PETROLEUM_TRUSTED_DEVICE_V1';
+const TRUSTED_USER_KEY = 'BAHU_PETROLEUM_TRUSTED_USER_V1';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
-      const stored = localStorage.getItem(`${LOCAL_STORAGE_KEY}_currentUser`);
-      return stored ? JSON.parse(stored) : initialUsers[0];
+      const isTrusted = localStorage.getItem(TRUSTED_DEVICE_KEY) === 'true';
+      if (isTrusted) {
+        const stored = localStorage.getItem(TRUSTED_USER_KEY);
+        if (stored) return JSON.parse(stored);
+      }
     } catch {
-      return initialUsers[0];
+      return null;
     }
+    return null; // Require authentication on new devices/sessions
   });
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -405,7 +414,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isLoggedIn = currentUser !== null;
 
   // Authentication Logic
-  const login = (identifier: string, pass: string, role?: UserRole): boolean => {
+  const login = (identifier: string, pass: string, role?: UserRole, rememberDevice: boolean = false): boolean => {
     const cleanId = identifier.trim().toLowerCase();
     
     // Find matching user in users array
@@ -416,7 +425,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (u.role === 'ADMIN') {
         // Admin can match email, primary phone, secondary phone, or name
         return (
-          u.email.toLowerCase() === cleanId ||
+          (u.email && u.email.toLowerCase() === cleanId) ||
           (u.phonePrimary && u.phonePrimary.replace(/[- ]/g, '') === cleanId.replace(/[- ]/g, '')) ||
           (u.phoneSecondary && u.phoneSecondary.replace(/[- ]/g, '') === cleanId.replace(/[- ]/g, '')) ||
           u.name.toLowerCase() === cleanId
@@ -428,17 +437,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     if (matched) {
-      if (matched.password && matched.password !== pass) {
+      const isPassValid = verifyPassword(pass, matched.password);
+      if (!isPassValid) {
         return false;
       }
       setCurrentUser(matched);
+
+      if (rememberDevice) {
+        localStorage.setItem(TRUSTED_DEVICE_KEY, 'true');
+        localStorage.setItem(TRUSTED_USER_KEY, JSON.stringify(matched));
+      } else {
+        localStorage.removeItem(TRUSTED_DEVICE_KEY);
+        localStorage.removeItem(TRUSTED_USER_KEY);
+      }
       return true;
     }
 
-    // Default Fallback matching for CEO Admin or Employee
-    if (cleanId === '03009654471' || cleanId === '03129654471' || cleanId === 'admin') {
-      setCurrentUser(initialUsers[0]);
-      return true;
+    // Default Fallback matching for CEO Admin when user collection is initializing
+    if (cleanId === '03009654471' || cleanId === '03129654471' || cleanId === 'admin' || cleanId === 'admin@bahupetroleum.com') {
+      const adminUser = users.find(u => u.role === 'ADMIN') || initialUsers[0];
+      if (verifyPassword(pass, adminUser.password)) {
+        setCurrentUser(adminUser);
+        if (rememberDevice) {
+          localStorage.setItem(TRUSTED_DEVICE_KEY, 'true');
+          localStorage.setItem(TRUSTED_USER_KEY, JSON.stringify(adminUser));
+        } else {
+          localStorage.removeItem(TRUSTED_DEVICE_KEY);
+          localStorage.removeItem(TRUSTED_USER_KEY);
+        }
+        return true;
+      }
     }
 
     return false;
@@ -446,6 +474,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logout = () => {
     setCurrentUser(null);
+    localStorage.removeItem(TRUSTED_DEVICE_KEY);
+    localStorage.removeItem(TRUSTED_USER_KEY);
+    localStorage.removeItem(`${LOCAL_STORAGE_KEY}_currentUser`);
+  };
+
+  const sendPasswordResetOTP = (identifier: string) => {
+    const cleanId = identifier.trim().toLowerCase();
+    const cleanPhone = cleanId.replace(/[- ]/g, '');
+
+    const matched = users.find(u => {
+      if (!u.active) return false;
+      return (
+        (u.email && u.email.toLowerCase() === cleanId) ||
+        (u.phonePrimary && u.phonePrimary.replace(/[- ]/g, '') === cleanPhone) ||
+        (u.phoneSecondary && u.phoneSecondary.replace(/[- ]/g, '') === cleanPhone) ||
+        u.name.toLowerCase() === cleanId
+      );
+    });
+
+    if (!matched) {
+      return {
+        success: false,
+        message: 'No active user account found matching this email address or mobile number.',
+      };
+    }
+
+    const otp = generateOTP();
+    return {
+      success: true,
+      message: `Verification code (OTP) sent to ${matched.email || matched.phonePrimary || matched.name}.`,
+      otp,
+      user: matched,
+    };
+  };
+
+  const resetUserPassword = (userId: string, newPass: string): boolean => {
+    const hashedPassword = simpleHashPassword(newPass);
+    setUsers(prev =>
+      prev.map(u => {
+        if (u.id === userId) {
+          const updated = { ...u, password: hashedPassword };
+          syncSaveDoc('users', updated);
+          return updated;
+        }
+        return u;
+      })
+    );
+    return true;
   };
 
   const switchRole = (role: UserRole) => {
@@ -459,6 +535,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Admin Profile Update
   const updateAdminProfile = (data: { name: string; email: string; phonePrimary: string; phoneSecondary: string; password?: string }) => {
+    const updatedPassword = data.password ? simpleHashPassword(data.password) : undefined;
     setUsers(prev =>
       prev.map(u => {
         if (u.role === 'ADMIN') {
@@ -468,7 +545,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             email: data.email,
             phonePrimary: data.phonePrimary,
             phoneSecondary: data.phoneSecondary,
-            password: data.password || u.password,
+            password: updatedPassword || u.password,
           };
           syncSaveDoc('users', updated);
           return updated;
@@ -483,7 +560,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: data.email,
         phonePrimary: data.phonePrimary,
         phoneSecondary: data.phoneSecondary,
-        password: data.password || prev.password,
+        password: updatedPassword || prev.password,
       } : null);
     }
   };
@@ -494,7 +571,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `u-emp-${Date.now()}`,
       name: data.name,
       email: '',
-      password: data.password || '123456',
+      password: simpleHashPassword(data.password || '123456'),
       role: 'EMPLOYEE',
       active: true,
       createdAt: new Date().toISOString(),
@@ -504,9 +581,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetEmployeePassword = (id: string, newPass: string) => {
+    const hashedPassword = simpleHashPassword(newPass);
     setUsers(prev => prev.map(u => {
       if (u.id === id) {
-        const updated = { ...u, password: newPass };
+        const updated = { ...u, password: hashedPassword };
         syncSaveDoc('users', updated);
         return updated;
       }
@@ -1311,6 +1389,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         canDelete,
         canManageUsers,
         login,
+        sendPasswordResetOTP,
+        resetUserPassword,
         logout,
         switchRole,
         updateAdminProfile,

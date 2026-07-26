@@ -36,7 +36,7 @@ export const initialUsers: User[] = [
   {
     id: 'u-admin-1',
     name: 'Mian Rashid Saleem',
-    email: '',
+    email: 'admin@bahupetroleum.com',
     phonePrimary: '03009654471',
     phoneSecondary: '03129654471',
     password: 'admin',

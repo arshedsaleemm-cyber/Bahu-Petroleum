@@ -8,18 +8,13 @@ import {
   WifiOff,
   UserCheck,
   ShieldCheck,
-  User as UserIcon,
   Fuel,
-  LogOut,
-  Layers,
   Menu,
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const {
     currentUser,
-    switchRole,
-    logout,
     syncStatus,
     triggerManualSync,
     setIsSearchOpen,
@@ -111,38 +106,22 @@ export const Header: React.FC = () => {
             )}
           </button>
 
-          {/* User Role Switcher Quick Bar */}
-          <div className="flex items-center gap-1 bg-blue-900/80 p-1 rounded-xl border border-blue-800">
+          {/* Active User Role Badge (No switch role, no header logout) */}
+          <div className="flex items-center gap-1.5 bg-blue-900/80 px-2.5 py-1.5 rounded-xl border border-blue-800">
             {currentUser?.role === 'ADMIN' ? (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-600 text-white text-xs font-semibold shadow-sm">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">ADMIN</span>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="hidden sm:inline text-white font-extrabold">ADMIN</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold shadow-sm">
-                <UserCheck className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">EMPLOYEE</span>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-300">
+                <UserCheck className="w-4 h-4 text-blue-400 shrink-0" />
+                <span className="hidden sm:inline text-white font-extrabold">EMPLOYEE</span>
               </div>
             )}
-
-            {/* Switch Role Quick Dropdown Toggle */}
-            <button
-              onClick={() => switchRole(currentUser?.role === 'ADMIN' ? 'EMPLOYEE' : 'ADMIN')}
-              className="px-1.5 py-1 text-[10px] sm:text-[11px] text-blue-200 hover:text-white bg-blue-950 hover:bg-blue-800 rounded-lg font-medium transition-all"
-              title="Toggle Role for testing permissions"
-            >
-              <span className="hidden sm:inline">Switch Role</span>
-              <span className="sm:hidden">↻</span>
-            </button>
-
-            {/* Logout */}
-            <button
-              onClick={logout}
-              className="p-1.5 text-red-300 hover:text-red-100 hover:bg-red-900/50 rounded-lg transition-all"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            <span className="text-[11px] text-blue-200 font-medium border-l border-blue-800 pl-2 max-w-[120px] truncate hidden md:inline">
+              {currentUser?.name || 'User'}
+            </span>
           </div>
         </div>
       </div>

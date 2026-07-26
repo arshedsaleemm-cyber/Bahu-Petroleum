@@ -10,7 +10,6 @@ export const GlobalSearchModal: React.FC = () => {
     searchQuery,
     setSearchQuery,
     deliveries,
-    machineSales,
     lubricants,
     workers,
     udhaarCustomers,
@@ -31,15 +30,6 @@ export const GlobalSearchModal: React.FC = () => {
           (d.invoiceNumber || '').toLowerCase().includes(query) ||
           (d.vehicleNumber || '').toLowerCase().includes(query) ||
           (d.driverName || '').toLowerCase().includes(query)
-      )
-    : [];
-
-  const filteredSales = query
-    ? (machineSales || []).filter(
-        s =>
-          (s.machineName || '').toLowerCase().includes(query) ||
-          (s.operatorName || '').toLowerCase().includes(query) ||
-          (s.shift || '').toLowerCase().includes(query)
       )
     : [];
 
@@ -91,7 +81,6 @@ export const GlobalSearchModal: React.FC = () => {
 
   const totalResults =
     filteredDeliveries.length +
-    filteredSales.length +
     filteredLubs.length +
     filteredWorkers.length +
     filteredCustomers.length +

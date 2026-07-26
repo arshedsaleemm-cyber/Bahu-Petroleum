@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { testFirestoreConnection } from '../lib/firebase';
 import {
+  subscribeToCollection,
+  subscribeToDoc,
+  syncSaveDoc,
+  syncDeleteDoc,
+  syncSaveSingleton,
+} from '../lib/firestoreSync';
+import {
   User,
   FuelDelivery,
   Tank,
@@ -77,6 +84,8 @@ interface AppContextType {
   setActiveTab: (tab: string) => void;
   currentView: string;
   setCurrentView: (view: string) => void;
+  isMobileDrawerOpen: boolean;
+  setIsMobileDrawerOpen: (open: boolean) => void;
   syncStatus: SyncStatus;
   isSearchOpen: boolean;
   setIsSearchOpen: (open: boolean) => void;
@@ -228,6 +237,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [currentView, setCurrentView] = useState<string>('dashboard');
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -296,7 +306,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }
 
-  // Sync to local storage
+  // Real-time Firestore Subscriptions
+  useEffect(() => {
+    testFirestoreConnection();
+
+    const unsubs: (() => void)[] = [];
+
+    unsubs.push(subscribeToCollection<User>('users', setUsers, initialUsers));
+    unsubs.push(subscribeToCollection<Tank>('tanks', setTanks, initialTanks));
+    unsubs.push(subscribeToCollection<FuelDelivery>('deliveries', setDeliveries, initialDeliveries));
+    unsubs.push(subscribeToCollection<LubricantProduct>('lubricants', setLubricants, initialLubricants));
+    unsubs.push(subscribeToCollection<Worker>('workers', setWorkers, initialWorkers));
+    unsubs.push(subscribeToCollection<AttendanceRecord>('attendance', setAttendance, initialAttendance));
+    unsubs.push(subscribeToCollection<SalaryRecord>('salaries', setSalaries, initialSalaries));
+    unsubs.push(subscribeToCollection<UdhaarCustomer>('udhaarCustomers', setUdhaarCustomers, initialUdhaarCustomers));
+    unsubs.push(subscribeToCollection<ExpenseCategory>('categories', setCategories, initialCategories));
+    unsubs.push(subscribeToCollection<Expense>('expenses', setExpenses, initialExpenses));
+    unsubs.push(subscribeToCollection<BankAccount>('bankAccounts', setBankAccounts, initialBankAccounts));
+    unsubs.push(subscribeToCollection<BankTransaction>('bankTransactions', setBankTransactions, initialBankTransactions));
+    unsubs.push(subscribeToDoc<CashRegister>('singletons/cashRegister', setCashRegister, initialCashRegister));
+    unsubs.push(subscribeToCollection<CreditCardTransaction>('creditCardSales', setCreditCardSales, initialCreditCardSales));
+    unsubs.push(subscribeToCollection<InfiniCardTransaction>('infiniCardSales', setInfiniCardSales, initialInfiniCardSales));
+    unsubs.push(subscribeToCollection<ShopModuleData>('shops', setShops, initialShops));
+    unsubs.push(subscribeToCollection<RentalAgreement>('rentalAgreements', setRentalAgreements, initialRentalAgreements));
+    unsubs.push(subscribeToCollection<AppNotification>('notifications', setNotifications, initialNotifications));
+
+    unsubs.push(subscribeToCollection<TyreShopService>('tyreShopServices', setTyreShopServices, initialTyreServices));
+    unsubs.push(subscribeToCollection<CarWashService>('carWashServices', setCarWashServices, initialCarWashServices));
+    unsubs.push(subscribeToCollection<TuckShopItem>('tuckShopItems', setTuckShopItems, initialTuckShopItems));
+
+    unsubs.push(subscribeToCollection<RestaurantSale>('restaurantSales', setRestaurantSales, initialRestaurantSales));
+    unsubs.push(subscribeToCollection<RestaurantExpense>('restaurantExpenses', setRestaurantExpenses, initialRestaurantExpenses));
+    unsubs.push(subscribeToCollection<RestaurantStaff>('restaurantStaff', setRestaurantStaff, initialRestaurantStaff));
+    unsubs.push(subscribeToCollection<RestaurantAttendance>('restaurantAttendance', setRestaurantAttendance, initialRestaurantAttendance));
+    unsubs.push(subscribeToCollection<RestaurantSalaryRecord>('restaurantSalaries', setRestaurantSalaries, initialRestaurantSalaries));
+    unsubs.push(subscribeToCollection<RestaurantSupplier>('restaurantSuppliers', setRestaurantSuppliers, initialRestaurantSuppliers));
+    unsubs.push(subscribeToCollection<RestaurantKitchenInventory>('restaurantInventory', setRestaurantInventory, initialRestaurantInventory));
+    unsubs.push(subscribeToCollection<RestaurantPurchase>('restaurantPurchases', setRestaurantPurchases, initialRestaurantPurchases));
+    unsubs.push(subscribeToCollection<RestaurantDeposit>('restaurantDeposits', setRestaurantDeposits, initialRestaurantDeposits));
+
+    unsubs.push(subscribeToCollection<DailySalesEntry>('dailySalesEntries', setDailySalesEntries, initialDailySalesEntries));
+
+    return () => {
+      unsubs.forEach(unsub => unsub());
+    };
+  }, []);
+
+  // Sync to local storage for offline fast fallback
   useEffect(() => saveLocal('currentUser', currentUser), [currentUser]);
   useEffect(() => saveLocal('users', users), [users]);
   useEffect(() => saveLocal('tanks', tanks), [tanks]);
@@ -406,7 +462,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers(prev =>
       prev.map(u => {
         if (u.role === 'ADMIN') {
-          return {
+          const updated = {
             ...u,
             name: data.name,
             email: data.email,
@@ -414,6 +470,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             phoneSecondary: data.phoneSecondary,
             password: data.password || u.password,
           };
+          syncSaveDoc('users', updated);
+          return updated;
         }
         return u;
       })
@@ -442,21 +500,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
     };
     setUsers(prev => [...prev, newEmp]);
+    syncSaveDoc('users', newEmp);
   };
 
   const resetEmployeePassword = (id: string, newPass: string) => {
-    setUsers(prev => prev.map(u => (u.id === id ? { ...u, password: newPass } : u)));
+    setUsers(prev => prev.map(u => {
+      if (u.id === id) {
+        const updated = { ...u, password: newPass };
+        syncSaveDoc('users', updated);
+        return updated;
+      }
+      return u;
+    }));
   };
 
   const toggleEmployeeStatus = (id: string) => {
-    setUsers(prev => prev.map(u => (u.id === id ? { ...u, active: !u.active } : u)));
+    setUsers(prev => prev.map(u => {
+      if (u.id === id) {
+        const updated = { ...u, active: !u.active };
+        syncSaveDoc('users', updated);
+        return updated;
+      }
+      return u;
+    }));
   };
 
   const deleteEmployee = (id: string) => {
     setUsers(prev => prev.filter(u => u.id !== id));
+    syncDeleteDoc('users', id);
   };
 
-  // Fuel Delivery Action (with Dip Measurement Verification)
+  // Fuel Delivery Action
   const addDelivery = (data: Omit<FuelDelivery, 'id' | 'createdAt' | 'createdBy'>) => {
     const newDelivery: FuelDelivery = {
       ...data,
@@ -466,6 +540,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setDeliveries(prev => [newDelivery, ...prev]);
+    syncSaveDoc('deliveries', newDelivery);
 
     // Update target tank current stock
     if (data.tankId) {
@@ -474,11 +549,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (t.id === data.tankId) {
             const added = data.totalLitersReceived;
             const newFuel = t.currentFuel + added;
-            return {
+            const updatedTank = {
               ...t,
               currentFuel: newFuel,
               closingStock: newFuel,
             };
+            syncSaveDoc('tanks', updatedTank);
+            return updatedTank;
           }
           return t;
         })
@@ -489,30 +566,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteDelivery = (id: string) => {
     if (!canDelete) return;
     setDeliveries(prev => prev.filter(d => d.id !== id));
+    syncDeleteDoc('deliveries', id);
   };
 
   const addTank = (data: Omit<Tank, 'id'>) => {
-    setTanks(prev => [...prev, { ...data, id: `tank-${Date.now()}` }]);
+    const newTank: Tank = { ...data, id: `tank-${Date.now()}` };
+    setTanks(prev => [...prev, newTank]);
+    syncSaveDoc('tanks', newTank);
   };
 
   const updateTank = (tank: Tank) => {
     if (!canEdit) return;
     setTanks(prev => prev.map(t => (t.id === tank.id ? tank : t)));
+    syncSaveDoc('tanks', tank);
   };
 
   const deleteTank = (id: string) => {
     if (!canDelete) return;
     setTanks(prev => prev.filter(t => t.id !== id));
+    syncDeleteDoc('tanks', id);
   };
 
   // Lubricants
   const addLubricant = (data: Omit<LubricantProduct, 'id'>) => {
-    setLubricants(prev => [...prev, { ...data, id: `lub-${Date.now()}` }]);
+    const newLub: LubricantProduct = { ...data, id: `lub-${Date.now()}` };
+    setLubricants(prev => [...prev, newLub]);
+    syncSaveDoc('lubricants', newLub);
   };
 
   const updateLubricant = (lub: LubricantProduct) => {
     if (!canEdit) return;
     setLubricants(prev => prev.map(l => (l.id === lub.id ? lub : l)));
+    syncSaveDoc('lubricants', lub);
   };
 
   const adjustLubricantStock = (id: string, qty: number, type: 'IN' | 'OUT') => {
@@ -522,7 +607,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const newStockIn = type === 'IN' ? l.stockIn + qty : l.stockIn;
           const newStockOut = type === 'OUT' ? l.stockOut + qty : l.stockOut;
           const remaining = Math.max(0, newStockIn - newStockOut);
-          return { ...l, stockIn: newStockIn, stockOut: newStockOut, remainingStock: remaining };
+          const updated = { ...l, stockIn: newStockIn, stockOut: newStockOut, remainingStock: remaining };
+          syncSaveDoc('lubricants', updated);
+          return updated;
         }
         return l;
       })
@@ -532,44 +619,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteLubricant = (id: string) => {
     if (!canDelete) return;
     setLubricants(prev => prev.filter(l => l.id !== id));
+    syncDeleteDoc('lubricants', id);
   };
 
   // Workers
   const addWorker = (data: Omit<Worker, 'id'>) => {
     const newId = `w-${Date.now()}`;
-    setWorkers(prev => [...prev, { ...data, id: newId }]);
-    setSalaries(prev => [
-      ...prev,
-      {
-        id: `sal-${Date.now()}`,
-        workerId: newId,
-        monthlySalary: data.monthlySalary || 0,
-        totalAdvance: 0,
-        advanceHistory: [],
-        salaryPaid: 0,
-        pendingSalary: data.monthlySalary || 0,
-        remainingSalary: data.monthlySalary || 0,
-      },
-    ]);
+    const newWorker: Worker = { ...data, id: newId };
+    const newSalary: SalaryRecord = {
+      id: `sal-${Date.now()}`,
+      workerId: newId,
+      monthlySalary: data.monthlySalary || 0,
+      totalAdvance: 0,
+      advanceHistory: [],
+      salaryPaid: 0,
+      pendingSalary: data.monthlySalary || 0,
+      remainingSalary: data.monthlySalary || 0,
+    };
+    setWorkers(prev => [...prev, newWorker]);
+    setSalaries(prev => [...prev, newSalary]);
+    syncSaveDoc('workers', newWorker);
+    syncSaveDoc('salaries', newSalary);
   };
 
   const updateWorker = (worker: Worker) => {
     if (!canEdit) return;
     setWorkers(prev => prev.map(w => (w.id === worker.id ? worker : w)));
+    syncSaveDoc('workers', worker);
   };
 
   const deleteWorker = (id: string) => {
     if (!canDelete) return;
     setWorkers(prev => prev.filter(w => w.id !== id));
+    syncDeleteDoc('workers', id);
   };
 
   const markAttendance = (workerId: string, status: AttendanceRecord['status'], date: string, notes?: string) => {
     setAttendance(prev => {
       const existing = prev.find(a => a.workerId === workerId && a.date === date);
       if (existing) {
-        return prev.map(a => (a.id === existing.id ? { ...a, status, notes } : a));
+        const updated = { ...existing, status, notes };
+        syncSaveDoc('attendance', updated);
+        return prev.map(a => (a.id === existing.id ? updated : a));
       }
-      return [...prev, { id: `att-${Date.now()}`, workerId, date, status, notes }];
+      const newAtt: AttendanceRecord = { id: `att-${Date.now()}`, workerId, date, status, notes };
+      syncSaveDoc('attendance', newAtt);
+      return [...prev, newAtt];
     });
   };
 
@@ -583,13 +678,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ];
           const newTotalAdvance = s.totalAdvance + amount;
           const remaining = Math.max(0, s.monthlySalary - newTotalAdvance - s.salaryPaid);
-          return {
+          const updated = {
             ...s,
             totalAdvance: newTotalAdvance,
             advanceHistory: newAdvanceHistory,
             remainingSalary: remaining,
             pendingSalary: remaining,
           };
+          syncSaveDoc('salaries', updated);
+          return updated;
         }
         return s;
       })
@@ -602,13 +699,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (s.workerId === workerId) {
           const paid = s.salaryPaid + amount;
           const remaining = Math.max(0, s.monthlySalary - s.totalAdvance - paid);
-          return {
+          const updated = {
             ...s,
             salaryPaid: paid,
             remainingSalary: remaining,
             pendingSalary: remaining,
             lastPaymentDate: new Date().toISOString().slice(0, 10),
           };
+          syncSaveDoc('salaries', updated);
+          return updated;
         }
         return s;
       })
@@ -617,15 +716,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Udhaar Customers
   const addUdhaarCustomer = (data: Omit<UdhaarCustomer, 'id' | 'remainingBalance' | 'transactions'>) => {
-    setUdhaarCustomers(prev => [
-      ...prev,
-      {
-        ...data,
-        id: `udh-${Date.now()}`,
-        remainingBalance: (data.totalCredit || 0) - (data.paymentReceived || 0),
-        transactions: [],
-      },
-    ]);
+    const newCust: UdhaarCustomer = {
+      ...data,
+      id: `udh-${Date.now()}`,
+      remainingBalance: (data.totalCredit || 0) - (data.paymentReceived || 0),
+      transactions: [],
+    };
+    setUdhaarCustomers(prev => [...prev, newCust]);
+    syncSaveDoc('udhaarCustomers', newCust);
   };
 
   const addUdhaarTransaction = (
@@ -649,13 +747,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const totalCredit = type === 'CREDIT_PURCHASE' ? c.totalCredit + amount : c.totalCredit;
           const paymentReceived = type === 'PAYMENT_RECEIVED' ? c.paymentReceived + amount : c.paymentReceived;
           const remaining = totalCredit - paymentReceived;
-          return {
+          const updated = {
             ...c,
             totalCredit,
             paymentReceived,
             remainingBalance: remaining,
             transactions: [newTx, ...c.transactions],
           };
+          syncSaveDoc('udhaarCustomers', updated);
+          return updated;
         }
         return c;
       })
@@ -665,30 +765,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Expenses
   const addExpenseCategory = (name: string) => {
     if (!name.trim()) return;
-    setCategories(prev => [...prev, { id: `cat-${Date.now()}`, name: name.trim(), isCustom: true }]);
+    const newCat: ExpenseCategory = { id: `cat-${Date.now()}`, name: name.trim(), isCustom: true };
+    setCategories(prev => [...prev, newCat]);
+    syncSaveDoc('categories', newCat);
   };
 
   const addExpense = (data: Omit<Expense, 'id' | 'createdBy'>) => {
-    setExpenses(prev => [{ ...data, id: `exp-${Date.now()}`, createdBy: currentUser?.name || 'System' }, ...prev]);
+    const newExp: Expense = { ...data, id: `exp-${Date.now()}`, createdBy: currentUser?.name || 'System' };
+    setExpenses(prev => [newExp, ...prev]);
+    syncSaveDoc('expenses', newExp);
   };
 
   const deleteExpense = (id: string) => {
     if (!canDelete) return;
     setExpenses(prev => prev.filter(e => e.id !== id));
+    syncDeleteDoc('expenses', id);
   };
 
   // Bank
   const addBankAccount = (data: Omit<BankAccount, 'id' | 'currentBalance'>) => {
-    setBankAccounts(prev => [...prev, { ...data, id: `bank-${Date.now()}`, currentBalance: 0 }]);
+    const newBank: BankAccount = { ...data, id: `bank-${Date.now()}`, currentBalance: 0 };
+    setBankAccounts(prev => [...prev, newBank]);
+    syncSaveDoc('bankAccounts', newBank);
   };
 
   const addBankTransaction = (data: Omit<BankTransaction, 'id' | 'createdBy'>) => {
-    setBankTransactions(prev => [{ ...data, id: `bt-${Date.now()}`, createdBy: currentUser?.name || 'System' }, ...prev]);
+    const newTx: BankTransaction = { ...data, id: `bt-${Date.now()}`, createdBy: currentUser?.name || 'System' };
+    setBankTransactions(prev => [newTx, ...prev]);
+    syncSaveDoc('bankTransactions', newTx);
+
     setBankAccounts(prev =>
       prev.map(b => {
         if (b.id === data.bankId) {
           const change = data.type === 'Deposit' ? data.amount : -data.amount;
-          return { ...b, currentBalance: b.currentBalance + change };
+          const updated = { ...b, currentBalance: b.currentBalance + change };
+          syncSaveDoc('bankAccounts', updated);
+          return updated;
         }
         return b;
       })
@@ -696,35 +808,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCashRegister = (data: Partial<CashRegister>) => {
-    setCashRegister(prev => ({ ...prev, ...data }));
+    setCashRegister(prev => {
+      const updated = { ...prev, ...data };
+      syncSaveSingleton('singletons/cashRegister', updated);
+      return updated;
+    });
   };
 
   const addCreditCardSale = (data: Omit<CreditCardTransaction, 'id'>) => {
-    setCreditCardSales(prev => [{ ...data, id: `cc-${Date.now()}` }, ...prev]);
+    const newTx: CreditCardTransaction = { ...data, id: `cc-${Date.now()}` };
+    setCreditCardSales(prev => [newTx, ...prev]);
+    syncSaveDoc('creditCardSales', newTx);
   };
 
   const addInfiniCardSale = (data: Omit<InfiniCardTransaction, 'id'>) => {
-    setInfiniCardSales(prev => [{ ...data, id: `inf-${Date.now()}` }, ...prev]);
+    const newTx: InfiniCardTransaction = { ...data, id: `inf-${Date.now()}` };
+    setInfiniCardSales(prev => [newTx, ...prev]);
+    syncSaveDoc('infiniCardSales', newTx);
   };
 
   const updateShopData = (data: ShopModuleData) => {
     setShops(prev => prev.map(s => (s.id === data.id ? data : s)));
+    syncSaveDoc('shops', data);
   };
 
   const addRentalAgreement = (
     data: Omit<RentalAgreement, 'id' | 'amountPaid' | 'pendingAmount' | 'status' | 'paymentHistory'>
   ) => {
-    setRentalAgreements(prev => [
-      ...prev,
-      {
-        ...data,
-        id: `rent-${Date.now()}`,
-        amountPaid: 0,
-        pendingAmount: data.monthlyRent || 0,
-        status: 'Pending',
-        paymentHistory: [],
-      },
-    ]);
+    const newRental: RentalAgreement = {
+      ...data,
+      id: `rent-${Date.now()}`,
+      amountPaid: 0,
+      pendingAmount: data.monthlyRent || 0,
+      status: 'Pending',
+      paymentHistory: [],
+    };
+    setRentalAgreements(prev => [...prev, newRental]);
+    syncSaveDoc('rentalAgreements', newRental);
   };
 
   const receiveRentPayment = (rentalId: string, amount: number, monthPaidFor: string, receiptNo: string) => {
@@ -733,7 +853,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (r.id === rentalId) {
           const newPaid = r.amountPaid + amount;
           const pending = Math.max(0, r.monthlyRent - newPaid);
-          return {
+          const updated = {
             ...r,
             amountPaid: newPaid,
             pendingAmount: pending,
@@ -749,6 +869,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               ...r.paymentHistory,
             ],
           };
+          syncSaveDoc('rentalAgreements', updated);
+          return updated;
         }
         return r;
       })
@@ -757,63 +879,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sub-business Actions
   const addTyreShopService = (data: Omit<TyreShopService, 'id'>) => {
-    setTyreShopServices(prev => [{ ...data, id: `tyre-${Date.now()}` }, ...prev]);
+    const newTyre: TyreShopService = { ...data, id: `tyre-${Date.now()}` };
+    setTyreShopServices(prev => [newTyre, ...prev]);
+    syncSaveDoc('tyreShopServices', newTyre);
   };
 
   const deleteTyreShopService = (id: string) => {
     if (!canDelete) return;
     setTyreShopServices(prev => prev.filter(t => t.id !== id));
+    syncDeleteDoc('tyreShopServices', id);
   };
 
   const addCarWashService = (data: Omit<CarWashService, 'id'>) => {
-    setCarWashServices(prev => [{ ...data, id: `wash-${Date.now()}` }, ...prev]);
+    const newWash: CarWashService = { ...data, id: `wash-${Date.now()}` };
+    setCarWashServices(prev => [newWash, ...prev]);
+    syncSaveDoc('carWashServices', newWash);
   };
 
   const deleteCarWashService = (id: string) => {
     if (!canDelete) return;
     setCarWashServices(prev => prev.filter(w => w.id !== id));
+    syncDeleteDoc('carWashServices', id);
   };
 
   const addTuckShopItem = (data: Omit<TuckShopItem, 'id'>) => {
-    setTuckShopItems(prev => [{ ...data, id: `tuck-${Date.now()}` }, ...prev]);
+    const newTuck: TuckShopItem = { ...data, id: `tuck-${Date.now()}` };
+    setTuckShopItems(prev => [newTuck, ...prev]);
+    syncSaveDoc('tuckShopItems', newTuck);
   };
 
   const deleteTuckShopItem = (id: string) => {
     if (!canDelete) return;
     setTuckShopItems(prev => prev.filter(t => t.id !== id));
+    syncDeleteDoc('tuckShopItems', id);
   };
 
   // Restaurant Actions
   const addRestaurantSale = (data: Omit<RestaurantSale, 'id' | 'createdBy'>) => {
-    setRestaurantSales(prev => [{ ...data, id: `rsale-${Date.now()}`, createdBy: currentUser?.name || 'System' }, ...prev]);
+    const newSale: RestaurantSale = { ...data, id: `rsale-${Date.now()}`, createdBy: currentUser?.name || 'System' };
+    setRestaurantSales(prev => [newSale, ...prev]);
+    syncSaveDoc('restaurantSales', newSale);
   };
 
   const deleteRestaurantSale = (id: string) => {
     if (!canDelete) return;
     setRestaurantSales(prev => prev.filter(s => s.id !== id));
+    syncDeleteDoc('restaurantSales', id);
   };
 
   const addRestaurantExpense = (data: Omit<RestaurantExpense, 'id' | 'createdBy'>) => {
-    setRestaurantExpenses(prev => [{ ...data, id: `rexp-${Date.now()}`, createdBy: currentUser?.name || 'System' }, ...prev]);
+    const newExp: RestaurantExpense = { ...data, id: `rexp-${Date.now()}`, createdBy: currentUser?.name || 'System' };
+    setRestaurantExpenses(prev => [newExp, ...prev]);
+    syncSaveDoc('restaurantExpenses', newExp);
   };
 
   const deleteRestaurantExpense = (id: string) => {
     if (!canDelete) return;
     setRestaurantExpenses(prev => prev.filter(e => e.id !== id));
+    syncDeleteDoc('restaurantExpenses', id);
   };
 
   const addRestaurantStaff = (data: Omit<RestaurantStaff, 'id'>) => {
-    setRestaurantStaff(prev => [...prev, { ...data, id: `rstaff-${Date.now()}` }]);
+    const newStaff: RestaurantStaff = { ...data, id: `rstaff-${Date.now()}` };
+    setRestaurantStaff(prev => [...prev, newStaff]);
+    syncSaveDoc('restaurantStaff', newStaff);
   };
 
   const updateRestaurantStaff = (staff: RestaurantStaff) => {
     if (!canEdit) return;
     setRestaurantStaff(prev => prev.map(s => (s.id === staff.id ? staff : s)));
+    syncSaveDoc('restaurantStaff', staff);
   };
 
   const deleteRestaurantStaff = (id: string) => {
     if (!canDelete) return;
     setRestaurantStaff(prev => prev.filter(s => s.id !== id));
+    syncDeleteDoc('restaurantStaff', id);
   };
 
   const markRestaurantAttendance = (
@@ -826,9 +967,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRestaurantAttendance(prev => {
       const existing = prev.find(a => a.staffId === staffId && a.date === date);
       if (existing) {
-        return prev.map(a => (a.id === existing.id ? { ...a, status, notes } : a));
+        const updated = { ...existing, status, notes };
+        syncSaveDoc('restaurantAttendance', updated);
+        return prev.map(a => (a.id === existing.id ? updated : a));
       }
-      return [...prev, { id: `ratt-${Date.now()}`, staffId, staffName, date, status, notes }];
+      const newAtt: RestaurantAttendance = { id: `ratt-${Date.now()}`, staffId, staffName, date, status, notes };
+      syncSaveDoc('restaurantAttendance', newAtt);
+      return [...prev, newAtt];
     });
   };
 
@@ -840,53 +985,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     notes?: string
   ) => {
     const netPaid = amountPaid - advanceDeducted;
-    setRestaurantSalaries(prev => [
-      ...prev,
-      {
-        id: `rsal-${Date.now()}`,
-        staffId,
-        staffName,
-        date: new Date().toISOString().slice(0, 10),
-        amountPaid,
-        advanceDeducted,
-        netPaid,
-        notes,
-      },
-    ]);
+    const newSal: RestaurantSalaryRecord = {
+      id: `rsal-${Date.now()}`,
+      staffId,
+      staffName,
+      date: new Date().toISOString().slice(0, 10),
+      amountPaid,
+      advanceDeducted,
+      netPaid,
+      notes,
+    };
+    setRestaurantSalaries(prev => [...prev, newSal]);
+    syncSaveDoc('restaurantSalaries', newSal);
   };
 
   const addRestaurantSupplier = (data: Omit<RestaurantSupplier, 'id'>) => {
-    setRestaurantSuppliers(prev => [...prev, { ...data, id: `rsup-${Date.now()}` }]);
+    const newSup: RestaurantSupplier = { ...data, id: `rsup-${Date.now()}` };
+    setRestaurantSuppliers(prev => [...prev, newSup]);
+    syncSaveDoc('restaurantSuppliers', newSup);
   };
 
   const deleteRestaurantSupplier = (id: string) => {
     if (!canDelete) return;
     setRestaurantSuppliers(prev => prev.filter(s => s.id !== id));
+    syncDeleteDoc('restaurantSuppliers', id);
   };
 
   const addRestaurantInventory = (data: Omit<RestaurantKitchenInventory, 'id' | 'lastUpdated'>) => {
-    setRestaurantInventory(prev => [
-      ...prev,
-      { ...data, id: `rinv-${Date.now()}`, lastUpdated: new Date().toISOString().slice(0, 10) },
-    ]);
+    const newInv: RestaurantKitchenInventory = {
+      ...data,
+      id: `rinv-${Date.now()}`,
+      lastUpdated: new Date().toISOString().slice(0, 10),
+    };
+    setRestaurantInventory(prev => [...prev, newInv]);
+    syncSaveDoc('restaurantInventory', newInv);
   };
 
   const updateRestaurantInventory = (inv: RestaurantKitchenInventory) => {
     if (!canEdit) return;
     setRestaurantInventory(prev => prev.map(i => (i.id === inv.id ? inv : i)));
+    syncSaveDoc('restaurantInventory', inv);
   };
 
   const deleteRestaurantInventory = (id: string) => {
     if (!canDelete) return;
     setRestaurantInventory(prev => prev.filter(i => i.id !== id));
+    syncDeleteDoc('restaurantInventory', id);
   };
 
   const addRestaurantPurchase = (data: Omit<RestaurantPurchase, 'id'>) => {
-    setRestaurantPurchases(prev => [{ ...data, id: `rpur-${Date.now()}` }, ...prev]);
+    const newPur: RestaurantPurchase = { ...data, id: `rpur-${Date.now()}` };
+    setRestaurantPurchases(prev => [newPur, ...prev]);
+    syncSaveDoc('restaurantPurchases', newPur);
   };
 
   const addRestaurantDeposit = (data: Omit<RestaurantDeposit, 'id'>) => {
-    setRestaurantDeposits(prev => [{ ...data, id: `rdep-${Date.now()}` }, ...prev]);
+    const newDep: RestaurantDeposit = { ...data, id: `rdep-${Date.now()}` };
+    setRestaurantDeposits(prev => [newDep, ...prev]);
+    syncSaveDoc('restaurantDeposits', newDep);
   };
 
   // Daily Sales Entry Actions
@@ -898,11 +1054,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
     };
     setDailySalesEntries(prev => [newEntry, ...prev]);
+    syncSaveDoc('dailySalesEntries', newEntry);
   };
 
   const updateDailySalesEntry = (id: string, updated: Partial<DailySalesEntry>) => {
     setDailySalesEntries(prev =>
-      prev.map(entry => (entry.id === id ? { ...entry, ...updated } : entry))
+      prev.map(entry => {
+        if (entry.id === id) {
+          const merged = { ...entry, ...updated };
+          syncSaveDoc('dailySalesEntries', merged);
+          return merged;
+        }
+        return entry;
+      })
     );
   };
 
@@ -912,24 +1076,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     setDailySalesEntries(prev => prev.filter(entry => entry.id !== id));
+    syncDeleteDoc('dailySalesEntries', id);
   };
 
   // Misc
   const addUser = (data: Omit<User, 'id' | 'createdAt'>) => {
     if (!canManageUsers) return;
-    setUsers(prev => [...prev, { ...data, id: `u-${Date.now()}`, createdAt: new Date().toISOString() }]);
+    const newUser: User = { ...data, id: `u-${Date.now()}`, createdAt: new Date().toISOString() };
+    setUsers(prev => [...prev, newUser]);
+    syncSaveDoc('users', newUser);
   };
 
   const updateUserStatus = (userId: string, active: boolean) => {
     if (!canManageUsers) return;
-    setUsers(prev => prev.map(u => (u.id === userId ? { ...u, active } : u)));
+    setUsers(prev => prev.map(u => {
+      if (u.id === userId) {
+        const updated = { ...u, active };
+        syncSaveDoc('users', updated);
+        return updated;
+      }
+      return u;
+    }));
   };
 
   const markNotificationRead = (id: string) => {
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    setNotifications(prev => prev.map(n => {
+      if (n.id === id) {
+        const updated = { ...n, read: true };
+        syncSaveDoc('notifications', updated);
+        return updated;
+      }
+      return n;
+    }));
   };
 
   const clearAllNotifications = () => {
+    notifications.forEach(n => syncDeleteDoc('notifications', n.id));
     setNotifications([]);
   };
 
@@ -982,36 +1164,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const importDatabaseJSON = (jsonString: string): boolean => {
     try {
       const data = JSON.parse(jsonString);
-      if (data.users) setUsers(data.users);
-      if (data.tanks) setTanks(data.tanks);
-      if (data.deliveries) setDeliveries(data.deliveries);
-      if (data.lubricants) setLubricants(data.lubricants);
-      if (data.workers) setWorkers(data.workers);
-      if (data.attendance) setAttendance(data.attendance);
-      if (data.salaries) setSalaries(data.salaries);
-      if (data.udhaarCustomers) setUdhaarCustomers(data.udhaarCustomers);
-      if (data.expenses) setExpenses(data.expenses);
-      if (data.bankAccounts) setBankAccounts(data.bankAccounts);
-      if (data.bankTransactions) setBankTransactions(data.bankTransactions);
-      if (data.cashRegister) setCashRegister(data.cashRegister);
-      if (data.creditCardSales) setCreditCardSales(data.creditCardSales);
-      if (data.infiniCardSales) setInfiniCardSales(data.infiniCardSales);
-      if (data.shops) setShops(data.shops);
-      if (data.rentalAgreements) setRentalAgreements(data.rentalAgreements);
-      if (data.notifications) setNotifications(data.notifications);
-      if (data.tyreShopServices) setTyreShopServices(data.tyreShopServices);
-      if (data.carWashServices) setCarWashServices(data.carWashServices);
-      if (data.tuckShopItems) setTuckShopItems(data.tuckShopItems);
-      if (data.restaurantSales) setRestaurantSales(data.restaurantSales);
-      if (data.restaurantExpenses) setRestaurantExpenses(data.restaurantExpenses);
-      if (data.restaurantStaff) setRestaurantStaff(data.restaurantStaff);
-      if (data.restaurantAttendance) setRestaurantAttendance(data.restaurantAttendance);
-      if (data.restaurantSalaries) setRestaurantSalaries(data.restaurantSalaries);
-      if (data.restaurantSuppliers) setRestaurantSuppliers(data.restaurantSuppliers);
-      if (data.restaurantInventory) setRestaurantInventory(data.restaurantInventory);
-      if (data.restaurantPurchases) setRestaurantPurchases(data.restaurantPurchases);
-      if (data.restaurantDeposits) setRestaurantDeposits(data.restaurantDeposits);
-      if (data.dailySalesEntries) setDailySalesEntries(data.dailySalesEntries);
+      if (data.users) { setUsers(data.users); data.users.forEach((u: any) => syncSaveDoc('users', u)); }
+      if (data.tanks) { setTanks(data.tanks); data.tanks.forEach((t: any) => syncSaveDoc('tanks', t)); }
+      if (data.deliveries) { setDeliveries(data.deliveries); data.deliveries.forEach((d: any) => syncSaveDoc('deliveries', d)); }
+      if (data.lubricants) { setLubricants(data.lubricants); data.lubricants.forEach((l: any) => syncSaveDoc('lubricants', l)); }
+      if (data.workers) { setWorkers(data.workers); data.workers.forEach((w: any) => syncSaveDoc('workers', w)); }
+      if (data.attendance) { setAttendance(data.attendance); data.attendance.forEach((a: any) => syncSaveDoc('attendance', a)); }
+      if (data.salaries) { setSalaries(data.salaries); data.salaries.forEach((s: any) => syncSaveDoc('salaries', s)); }
+      if (data.udhaarCustomers) { setUdhaarCustomers(data.udhaarCustomers); data.udhaarCustomers.forEach((c: any) => syncSaveDoc('udhaarCustomers', c)); }
+      if (data.expenses) { setExpenses(data.expenses); data.expenses.forEach((e: any) => syncSaveDoc('expenses', e)); }
+      if (data.bankAccounts) { setBankAccounts(data.bankAccounts); data.bankAccounts.forEach((b: any) => syncSaveDoc('bankAccounts', b)); }
+      if (data.bankTransactions) { setBankTransactions(data.bankTransactions); data.bankTransactions.forEach((bt: any) => syncSaveDoc('bankTransactions', bt)); }
+      if (data.cashRegister) { setCashRegister(data.cashRegister); syncSaveSingleton('singletons/cashRegister', data.cashRegister); }
+      if (data.creditCardSales) { setCreditCardSales(data.creditCardSales); data.creditCardSales.forEach((cc: any) => syncSaveDoc('creditCardSales', cc)); }
+      if (data.infiniCardSales) { setInfiniCardSales(data.infiniCardSales); data.infiniCardSales.forEach((inf: any) => syncSaveDoc('infiniCardSales', inf)); }
+      if (data.shops) { setShops(data.shops); data.shops.forEach((s: any) => syncSaveDoc('shops', s)); }
+      if (data.rentalAgreements) { setRentalAgreements(data.rentalAgreements); data.rentalAgreements.forEach((r: any) => syncSaveDoc('rentalAgreements', r)); }
+      if (data.notifications) { setNotifications(data.notifications); data.notifications.forEach((n: any) => syncSaveDoc('notifications', n)); }
+      if (data.tyreShopServices) { setTyreShopServices(data.tyreShopServices); data.tyreShopServices.forEach((t: any) => syncSaveDoc('tyreShopServices', t)); }
+      if (data.carWashServices) { setCarWashServices(data.carWashServices); data.carWashServices.forEach((w: any) => syncSaveDoc('carWashServices', w)); }
+      if (data.tuckShopItems) { setTuckShopItems(data.tuckShopItems); data.tuckShopItems.forEach((t: any) => syncSaveDoc('tuckShopItems', t)); }
+      if (data.restaurantSales) { setRestaurantSales(data.restaurantSales); data.restaurantSales.forEach((s: any) => syncSaveDoc('restaurantSales', s)); }
+      if (data.restaurantExpenses) { setRestaurantExpenses(data.restaurantExpenses); data.restaurantExpenses.forEach((e: any) => syncSaveDoc('restaurantExpenses', e)); }
+      if (data.restaurantStaff) { setRestaurantStaff(data.restaurantStaff); data.restaurantStaff.forEach((s: any) => syncSaveDoc('restaurantStaff', s)); }
+      if (data.restaurantAttendance) { setRestaurantAttendance(data.restaurantAttendance); data.restaurantAttendance.forEach((a: any) => syncSaveDoc('restaurantAttendance', a)); }
+      if (data.restaurantSalaries) { setRestaurantSalaries(data.restaurantSalaries); data.restaurantSalaries.forEach((s: any) => syncSaveDoc('restaurantSalaries', s)); }
+      if (data.restaurantSuppliers) { setRestaurantSuppliers(data.restaurantSuppliers); data.restaurantSuppliers.forEach((s: any) => syncSaveDoc('restaurantSuppliers', s)); }
+      if (data.restaurantInventory) { setRestaurantInventory(data.restaurantInventory); data.restaurantInventory.forEach((i: any) => syncSaveDoc('restaurantInventory', i)); }
+      if (data.restaurantPurchases) { setRestaurantPurchases(data.restaurantPurchases); data.restaurantPurchases.forEach((p: any) => syncSaveDoc('restaurantPurchases', p)); }
+      if (data.restaurantDeposits) { setRestaurantDeposits(data.restaurantDeposits); data.restaurantDeposits.forEach((d: any) => syncSaveDoc('restaurantDeposits', d)); }
+      if (data.dailySalesEntries) { setDailySalesEntries(data.dailySalesEntries); data.dailySalesEntries.forEach((e: any) => syncSaveDoc('dailySalesEntries', e)); }
       return true;
     } catch (e) {
       console.error('Import error:', e);
@@ -1055,11 +1237,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.clear();
   };
 
-  // Test connection to Firestore on boot
-  useEffect(() => {
-    testFirestoreConnection();
-  }, []);
-
   const triggerManualSync = () => {
     setSyncStatus(prev => ({ ...prev, syncing: true }));
     testFirestoreConnection()
@@ -1089,6 +1266,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveTab: handleSetActiveTab,
         currentView,
         setCurrentView: handleSetCurrentView,
+        isMobileDrawerOpen,
+        setIsMobileDrawerOpen,
         syncStatus,
         isSearchOpen,
         setIsSearchOpen,

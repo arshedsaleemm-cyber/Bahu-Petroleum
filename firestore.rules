@@ -1,61 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    match /users/{userId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /tanks/{tankId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /deliveries/{deliveryId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /lubricants/{lubricantId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /workers/{workerId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /attendance/{attendanceId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /udhaarCustomers/{customerId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /expenses/{expenseId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /dailySalesEntries/{entryId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /bankAccounts/{accountId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /bankTransactions/{transactionId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /rentals/{rentalId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
   }
 }

@@ -87,7 +87,7 @@ export const Sidebar: React.FC = () => {
   const categories = Array.from(new Set(navItems.map(item => item.category || 'General')));
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-200 border-r border-slate-800 flex flex-col shrink-0 h-[calc(100vh-57px)] overflow-y-auto custom-scrollbar select-none">
+    <aside className="hidden md:flex w-64 bg-slate-900 text-slate-200 border-r border-slate-800 flex-col shrink-0 h-[calc(100vh-57px)] overflow-y-auto custom-scrollbar select-none">
       <div className="p-3 space-y-5">
         {categories.map(cat => {
           const items = navItems.filter(item => (item.category || 'General') === cat);

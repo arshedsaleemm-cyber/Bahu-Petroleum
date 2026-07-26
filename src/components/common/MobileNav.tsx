@@ -1,120 +1,208 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard,
   Truck,
-  Gauge,
-  Receipt,
-  BarChart3,
-  Menu,
-  X,
-  Container,
   Droplet,
+  Container,
   Package,
   Users,
   UserCheck,
   CalendarCheck,
   Banknote,
+  Receipt,
   Building2,
   Wallet,
   CreditCard,
+  CreditCard as InfiniIcon,
   CircleDot,
   Car,
   ShoppingBag,
   Building,
+  BarChart3,
   Bell,
   Settings,
+  X,
+  ChevronRight,
+  ChefHat,
+  Fuel,
 } from 'lucide-react';
 
+interface NavItem {
+  id: string;
+  label: string;
+  icon: React.FC<{ className?: string }>;
+  badge?: number | string;
+  badgeColor?: string;
+  category?: string;
+}
+
 export const MobileNav: React.FC = () => {
-  const { currentView, setCurrentView, notifications } = useApp();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const {
+    currentView,
+    setCurrentView,
+    isMobileDrawerOpen,
+    setIsMobileDrawerOpen,
+    notifications,
+    lubricants,
+    tanks,
+  } = useApp();
 
-  const mainTabs = [
-    { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-    { id: 'deliveries', label: 'Deliveries', icon: Truck },
-    { id: 'machines', label: 'Sales', icon: Gauge },
-    { id: 'expenses', label: 'Expenses', icon: Receipt },
-    { id: 'reports', label: 'Reports', icon: BarChart3 },
-  ];
+  const unreadNotifs = (notifications || []).filter(n => !n.read).length;
+  const lowLubricants = (lubricants || []).filter(l => l.remainingStock <= l.lowStockAlert).length;
+  const lowTanks = (tanks || []).filter(t => t.currentFuel <= t.lowStockThreshold).length;
 
-  const allModules = [
+  const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'deliveries', label: 'Fuel Deliveries', icon: Truck },
-    { id: 'inventory', label: 'Fuel Inventory', icon: Droplet },
-    { id: 'tanks', label: 'Tank Management', icon: Container },
-    { id: 'machines', label: 'Machine Sales', icon: Gauge },
-    { id: 'lubricants', label: 'Lubricants', icon: Package },
-    { id: 'customers', label: 'Udhaar Customers', icon: Users },
-    { id: 'workers', label: 'Workers', icon: UserCheck },
-    { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
-    { id: 'salary', label: 'Salary & Advances', icon: Banknote },
-    { id: 'expenses', label: 'Expenses', icon: Receipt },
-    { id: 'bank', label: 'Bank Management', icon: Building2 },
-    { id: 'cash', label: 'Cash Management', icon: Wallet },
-    { id: 'credit_card', label: 'Credit Card', icon: CreditCard },
-    { id: 'infini_card', label: 'Infini Card', icon: CreditCard },
-    { id: 'tyre_shop', label: 'Tyre Shop', icon: CircleDot },
-    { id: 'car_wash', label: 'Car Wash', icon: Car },
-    { id: 'tuck_shop', label: 'Tuck Shop', icon: ShoppingBag },
-    { id: 'rentals', label: 'Rental Income', icon: Building },
-    { id: 'reports', label: 'Reports', icon: BarChart3 },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'deliveries', label: 'Fuel Deliveries', icon: Truck, category: 'Fuel Operations' },
+    { id: 'inventory', label: 'Fuel Inventory', icon: Droplet, category: 'Fuel Operations' },
+    {
+      id: 'tanks',
+      label: 'Tank Management',
+      icon: Container,
+      badge: lowTanks > 0 ? lowTanks : undefined,
+      badgeColor: 'bg-red-600',
+      category: 'Fuel Operations',
+    },
+    { id: 'daily_petrol_cash', label: 'Daily Petrol Cash', icon: Droplet, category: 'Fuel Operations' },
+    { id: 'customers', label: 'Credit Customers (Udhaar)', icon: Users, category: 'Accounts & People' },
+    { id: 'workers', label: 'Workers', icon: UserCheck, category: 'Accounts & People' },
+    { id: 'attendance', label: 'Attendance', icon: CalendarCheck, category: 'Accounts & People' },
+    { id: 'salary', label: 'Salary & Advances', icon: Banknote, category: 'Accounts & People' },
+    { id: 'expenses', label: 'Expenses', icon: Receipt, category: 'Finance & Payments' },
+    { id: 'bank', label: 'Bank Management', icon: Building2, category: 'Finance & Payments' },
+    { id: 'cash', label: 'Cash Management', icon: Wallet, category: 'Finance & Payments' },
+    { id: 'credit_card', label: 'Credit Card', icon: CreditCard, category: 'Finance & Payments' },
+    { id: 'infini_card', label: 'Infini Card', icon: InfiniIcon, category: 'Finance & Payments' },
+    {
+      id: 'lubricants',
+      label: 'Lubricants',
+      icon: Package,
+      badge: lowLubricants > 0 ? lowLubricants : undefined,
+      badgeColor: 'bg-amber-600',
+      category: 'Sub-Business Modules',
+    },
+    { id: 'tyre_shop', label: 'Tyre Shop', icon: CircleDot, category: 'Sub-Business Modules' },
+    { id: 'car_wash', label: 'Car Wash', icon: Car, category: 'Sub-Business Modules' },
+    { id: 'tuck_shop', label: 'Tuck Shop', icon: ShoppingBag, category: 'Sub-Business Modules' },
+    { id: 'restaurant', label: 'Fast Food', icon: ChefHat, category: 'Sub-Business Modules' },
+    { id: 'rentals', label: 'Rental Income', icon: Building, category: 'Sub-Business Modules' },
+    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, category: 'System' },
+    {
+      id: 'notifications',
+      label: 'Notifications',
+      icon: Bell,
+      badge: unreadNotifs > 0 ? unreadNotifs : undefined,
+      badgeColor: 'bg-red-600',
+      category: 'System',
+    },
+    { id: 'settings', label: 'Settings', icon: Settings, category: 'System' },
   ];
+
+  const categories = Array.from(new Set(navItems.map(item => item.category || 'General')));
+
+  const handleSelect = (id: string) => {
+    setCurrentView(id);
+    setIsMobileDrawerOpen(false);
+  };
 
   return (
     <>
-      {/* Drawer Overlay for Mobile Drawer Menu */}
-      {isMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden flex justify-end">
-          <div className="w-4/5 max-w-xs bg-slate-900 h-full p-4 overflow-y-auto flex flex-col justify-between text-white shadow-2xl animate-in slide-in-from-right">
-            <div>
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-                <div className="font-bold text-lg text-white">Bahu Modules</div>
-                <button
-                  onClick={() => setIsMenuOpen(false)}
-                  className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {/* Slide-In Left Hamburger Drawer Overlay for Mobile */}
+      {isMobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          {/* Backdrop */}
+          <div
+            onClick={() => setIsMobileDrawerOpen(false)}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+          />
 
-              <div className="grid grid-cols-2 gap-2">
-                {allModules.map(mod => {
-                  const Icon = mod.icon;
-                  const isActive = currentView === mod.id;
-                  return (
-                    <button
-                      key={mod.id}
-                      onClick={() => {
-                        setCurrentView(mod.id);
-                        setIsMenuOpen(false);
-                      }}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl text-center text-xs font-medium transition-all ${
-                        isActive
-                          ? 'bg-blue-600 text-white font-bold shadow-md'
-                          : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5 mb-1 text-blue-400" />
-                      <span className="truncate w-full">{mod.label}</span>
-                    </button>
-                  );
-                })}
+          {/* Drawer Menu Sliding in from LEFT */}
+          <div className="relative z-10 w-80 max-w-[85vw] bg-slate-900 text-slate-200 h-full flex flex-col shadow-2xl border-r border-slate-800 animate-in slide-in-from-left duration-200">
+            {/* Drawer Header */}
+            <div className="p-4 bg-blue-950 border-b border-blue-900 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center text-white">
+                  <Fuel className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="font-extrabold text-sm text-white tracking-wide">BAHU PETROLEUM</h2>
+                  <p className="text-[10px] text-blue-200">Navigation Menu</p>
+                </div>
               </div>
+              <button
+                onClick={() => setIsMobileDrawerOpen(false)}
+                className="p-1.5 rounded-lg bg-blue-900/60 text-blue-200 hover:text-white border border-blue-800"
+                title="Close Menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="pt-4 border-t border-slate-800 text-center text-[11px] text-slate-400">
-              Bahu Petroleum Enterprise App
+            {/* Categorized Menu List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-4 custom-scrollbar">
+              {categories.map(cat => {
+                const items = navItems.filter(item => (item.category || 'General') === cat);
+                return (
+                  <div key={cat} className="space-y-1">
+                    <div className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {cat}
+                    </div>
+                    <div className="space-y-1 mt-1">
+                      {items.map(item => {
+                        const Icon = item.icon;
+                        const isActive = currentView === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => handleSelect(item.id)}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                              isActive
+                                ? 'bg-gradient-to-r from-blue-700 to-blue-800 text-white font-bold shadow-md border-l-4 border-red-500'
+                                : 'bg-slate-800/50 text-slate-300 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-blue-400'}`} />
+                              <span className="truncate">{item.label}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {item.badge !== undefined && (
+                                <span
+                                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                                    item.badgeColor || 'bg-blue-600'
+                                  }`}
+                                >
+                                  {item.badge}
+                                </span>
+                              )}
+                              {isActive && <ChevronRight className="w-3.5 h-3.5 text-blue-200" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 border-t border-slate-800 bg-slate-950 text-center text-[11px] text-slate-400">
+              Bahu Petroleum Enterprise • Real-Time Sync
             </div>
           </div>
         </div>
       )}
 
-      {/* Bottom Sticky Mobile Navigation Bar */}
+      {/* Bottom Quick Bar for Mobile */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-blue-950 text-white border-t border-blue-900 px-2 py-1.5 md:hidden flex items-center justify-around shadow-lg">
-        {mainTabs.map(tab => {
+        {[
+          { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+          { id: 'deliveries', label: 'Deliveries', icon: Truck },
+          { id: 'daily_petrol_cash', label: 'Daily Cash', icon: Droplet },
+          { id: 'reports', label: 'Reports', icon: BarChart3 },
+        ].map(tab => {
           const Icon = tab.icon;
           const isActive = currentView === tab.id;
           return (
@@ -132,11 +220,11 @@ export const MobileNav: React.FC = () => {
         })}
 
         <button
-          onClick={() => setIsMenuOpen(true)}
+          onClick={() => setIsMobileDrawerOpen(true)}
           className="flex flex-col items-center justify-center px-2 py-1 rounded-lg text-[10px] font-medium text-blue-200 hover:text-white"
         >
-          <Menu className="w-5 h-5 text-red-400" />
-          <span className="mt-0.5">All Modules</span>
+          <X className="w-5 h-5 text-red-400 rotate-45" />
+          <span className="mt-0.5">☰ Menu</span>
         </button>
       </nav>
     </>

@@ -4,6 +4,7 @@ import { Tank } from '../../types';
 import { TankVisualizer } from '../common/TankVisualizer';
 import { formatLiters } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 import { Container, Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
 
 export const TankManagementView: React.FC = () => {
@@ -11,6 +12,7 @@ export const TankManagementView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTank, setEditingTank] = useState<Tank | null>(null);
+  const [tankToDelete, setTankToDelete] = useState<string | null>(null);
 
   // Form State
   const [tankName, setTankName] = useState('');
@@ -102,35 +104,59 @@ export const TankManagementView: React.FC = () => {
       </div>
 
       {/* Tank Gauges Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {tanks.map(tank => (
-          <div key={tank.id} className="relative group">
-            <TankVisualizer tank={tank} onEdit={() => canEdit && openEditModal(tank)} />
+      {tanks.length === 0 ? (
+        <div className="bg-white rounded-2xl p-8 text-center border border-slate-200">
+          <Container className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800">No Tanks Configured</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            All tanks have been deleted or none exist yet. Click the "Add Underground Tank" button above to create one.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {tanks.map(tank => (
+            <div key={tank.id} className="relative group">
+              <TankVisualizer tank={tank} onEdit={() => canEdit && openEditModal(tank)} />
 
-            {/* Quick Action Buttons on Card Hover */}
-            <div className="absolute top-3 right-3 flex items-center gap-1">
-              {canEdit && (
-                <button
-                  onClick={() => openEditModal(tank)}
-                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 transition-all shadow-sm"
-                  title="Edit Tank Specs"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-              {canDelete && tanks.length > 1 && (
-                <button
-                  onClick={() => deleteTank(tank.id)}
-                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white text-slate-600 transition-all shadow-sm"
-                  title="Delete Tank"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
+              {/* Quick Action Buttons on Card Hover */}
+              <div className="absolute top-3 right-3 flex items-center gap-1">
+                {canEdit && (
+                  <button
+                    onClick={() => openEditModal(tank)}
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 transition-all shadow-sm"
+                    title="Edit Tank Specs"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={() => setTankToDelete(tank.id)}
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white text-slate-600 transition-all shadow-sm cursor-pointer"
+                    title="Delete Tank"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={tankToDelete !== null}
+        title="Permanently Delete Tank"
+        message="Are you sure you want to permanently delete this tank? This action cannot be undone."
+        onConfirm={() => {
+          if (tankToDelete) {
+            deleteTank(tankToDelete);
+            setTankToDelete(null);
+          }
+        }}
+        onCancel={() => setTankToDelete(null)}
+      />
 
       {/* Modal Form */}
       {isModalOpen && (

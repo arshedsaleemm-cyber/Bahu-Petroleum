@@ -26,6 +26,7 @@ import { RestaurantView } from './components/modules/RestaurantView';
 import { CreditCardSalesView } from './components/modules/CreditCardSalesView';
 import { InfiniCardSalesView } from './components/modules/InfiniCardSalesView';
 import { DailyPetrolCashView } from './components/modules/DailyPetrolCashView';
+import { BahuAIAssistantView } from './components/modules/BahuAIAssistantView';
 import { ReportsView } from './components/modules/ReportsView';
 import { SettingsView } from './components/modules/SettingsView';
 
@@ -40,6 +41,9 @@ const MainLayout: React.FC = () => {
     switch (currentView) {
       case 'dashboard':
         return <DashboardView />;
+      case 'bahu_ai':
+      case 'ai_assistant':
+        return <BahuAIAssistantView />;
       case 'deliveries':
         return <FuelDeliveriesView />;
       case 'inventory':

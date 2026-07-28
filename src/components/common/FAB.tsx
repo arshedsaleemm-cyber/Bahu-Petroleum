@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Plus, Gauge, Truck, Receipt, Users, Building2, X } from 'lucide-react';
+import { Plus, Gauge, Truck, Receipt, Users, Building2, Bot, X } from 'lucide-react';
 
 export const FAB: React.FC = () => {
   const { setCurrentView } = useApp();
   const [isOpen, setIsOpen] = useState(false);
 
   const quickActions = [
+    { label: 'Bahu AI Assistant', view: 'bahu_ai', icon: Bot, bg: 'bg-gradient-to-r from-red-600 to-blue-600' },
     { label: 'Machine Sale', view: 'machines', icon: Gauge, bg: 'bg-blue-600' },
     { label: 'Fuel Delivery', view: 'deliveries', icon: Truck, bg: 'bg-red-600' },
     { label: 'Expense Entry', view: 'expenses', icon: Receipt, bg: 'bg-amber-600' },

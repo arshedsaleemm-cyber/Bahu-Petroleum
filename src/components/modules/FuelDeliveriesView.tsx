@@ -4,6 +4,7 @@ import { FuelDelivery, FuelType } from '../../types';
 import { formatCurrency, formatLiters, formatDate } from '../../utils/formatters';
 import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
 import { PermissionNotice } from '../common/PermissionNotice';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 import {
   Truck,
   Plus,
@@ -29,6 +30,7 @@ export const FuelDeliveriesView: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [deliveryToDelete, setDeliveryToDelete] = useState<string | null>(null);
 
   // Form State
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().slice(0, 10));
@@ -306,8 +308,9 @@ export const FuelDeliveriesView: React.FC = () => {
 
                   {canDelete && (
                     <button
-                      onClick={() => deleteDelivery(del.id)}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-slate-500 transition-all"
+                      onClick={() => setDeliveryToDelete(del.id)}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-slate-500 transition-all cursor-pointer"
+                      title="Delete Delivery Log"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -491,6 +494,19 @@ export const FuelDeliveriesView: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Delete Delivery Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={deliveryToDelete !== null}
+        title="Permanently Delete Fuel Delivery Log"
+        message="Are you sure you want to permanently delete this fuel delivery shipment record? This action cannot be undone."
+        onConfirm={() => {
+          if (deliveryToDelete) {
+            deleteDelivery(deliveryToDelete);
+            setDeliveryToDelete(null);
+          }
+        }}
+        onCancel={() => setDeliveryToDelete(null)}
+      />
     </div>
   );
 };

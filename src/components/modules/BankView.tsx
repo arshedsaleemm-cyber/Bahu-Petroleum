@@ -3,15 +3,17 @@ import { useApp } from '../../context/AppContext';
 import { BankAccount } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
-import { Building2, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw, Wallet, X, ShieldCheck } from 'lucide-react';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
+import { Building2, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw, Wallet, X, ShieldCheck, Trash2 } from 'lucide-react';
 
 export const BankView: React.FC = () => {
-  const { bankAccounts, cashRegister, addBankAccount, addBankTransaction } = useApp();
+  const { bankAccounts, cashRegister, addBankAccount, addBankTransaction, deleteBankAccount, canDelete } = useApp();
 
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [selectedAcc, setSelectedAcc] = useState<BankAccount | null>(null);
   const [txType, setTxType] = useState<'DEPOSIT' | 'WITHDRAWAL'>('DEPOSIT');
+  const [bankToDelete, setBankToDelete] = useState<string | null>(null);
 
   // Account Form State
   const [bankName, setBankName] = useState('Habib Bank Limited (HBL)');
@@ -43,7 +45,14 @@ export const BankView: React.FC = () => {
   const handleTxSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedAcc && txAmount > 0) {
-      addBankTransaction(selectedAcc.id, txType, txAmount, txDesc);
+      addBankTransaction({
+        bankId: selectedAcc.id,
+        bankName: selectedAcc.bankName,
+        type: txType as 'Deposit' | 'Withdrawal' | 'Transfer',
+        amount: txAmount,
+        referenceNumber: txDesc || `REF-${Date.now()}`,
+        date: new Date().toISOString().slice(0, 10),
+      });
     }
     setIsTxModalOpen(false);
   };
@@ -129,27 +138,39 @@ export const BankView: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                onClick={() => {
-                  setSelectedAcc(acc);
-                  setTxType('DEPOSIT');
-                  setIsTxModalOpen(true);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-xs flex items-center gap-1 transition-all"
-              >
-                <ArrowUpRight className="w-3.5 h-3.5" /> Deposit Cash
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedAcc(acc);
-                  setTxType('WITHDRAWAL');
-                  setIsTxModalOpen(true);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs flex items-center gap-1 transition-all"
-              >
-                <ArrowDownLeft className="w-3.5 h-3.5" /> Withdraw
-              </button>
+            <div className="flex items-center justify-between pt-1">
+              {canDelete ? (
+                <button
+                  onClick={() => setBankToDelete(acc.id)}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-600 hover:text-white text-slate-600 font-bold text-xs flex items-center gap-1 transition-all"
+                  title="Delete Bank Account"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                </button>
+              ) : <div />}
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedAcc(acc);
+                    setTxType('DEPOSIT');
+                    setIsTxModalOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-xs flex items-center gap-1 transition-all"
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" /> Deposit Cash
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedAcc(acc);
+                    setTxType('WITHDRAWAL');
+                    setIsTxModalOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs flex items-center gap-1 transition-all"
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5" /> Withdraw
+                </button>
+              </div>
             </div>
 
             {/* Transactions Log */}
@@ -161,14 +182,14 @@ export const BankView: React.FC = () => {
                     <div
                       key={tx.id}
                       className={`flex items-center justify-between text-xs p-2 rounded-lg border ${
-                        tx.type === 'DEPOSIT'
+                        tx.type === 'Deposit'
                           ? 'bg-emerald-50 border-emerald-100 text-emerald-950'
                           : 'bg-rose-50 border-rose-100 text-rose-950'
                       }`}
                     >
                       <div>
                         <span className="font-bold">{formatCurrency(tx.amount)}</span>
-                        <span className="text-[11px] ml-2 font-medium">{tx.description}</span>
+                        <span className="text-[11px] ml-2 font-medium">{tx.referenceNumber || tx.notes}</span>
                       </div>
                       <span className="text-[10px] opacity-75">{formatDate(tx.date)}</span>
                     </div>
@@ -310,6 +331,19 @@ export const BankView: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Delete Bank Account Modal */}
+      <ConfirmDeleteModal
+        isOpen={bankToDelete !== null}
+        title="Permanently Delete Bank Account"
+        message="Are you sure you want to permanently delete this bank account? All associated transaction logs will be removed."
+        onConfirm={() => {
+          if (bankToDelete) {
+            deleteBankAccount(bankToDelete);
+            setBankToDelete(null);
+          }
+        }}
+        onCancel={() => setBankToDelete(null)}
+      />
     </div>
   );
 };

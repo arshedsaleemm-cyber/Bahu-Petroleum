@@ -3,7 +3,11 @@ import { useApp } from '../../context/AppContext';
 import { Search, X, Truck, Gauge, Package, Users, Receipt, Building2, UserCheck, ChevronRight, DollarSign } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
-export const GlobalSearchModal: React.FC = () => {
+interface GlobalSearchModalProps {
+  onClose?: () => void;
+}
+
+export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ onClose }) => {
   const {
     isSearchOpen,
     setIsSearchOpen,
@@ -115,7 +119,10 @@ export const GlobalSearchModal: React.FC = () => {
             </button>
           )}
           <button
-            onClick={() => setIsSearchOpen(false)}
+            onClick={() => {
+              setIsSearchOpen(false);
+              onClose?.();
+            }}
             className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600"
           >
             <X className="w-5 h-5" />

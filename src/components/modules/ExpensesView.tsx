@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Expense } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 import { Receipt, Plus, Search, Tag, Calendar, Trash2, X, Paperclip } from 'lucide-react';
 
 export const ExpensesView: React.FC = () => {
@@ -12,6 +13,7 @@ export const ExpensesView: React.FC = () => {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -183,8 +185,9 @@ export const ExpensesView: React.FC = () => {
                     {canDelete && (
                       <td className="p-3.5 text-center">
                         <button
-                          onClick={() => deleteExpense(exp.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          onClick={() => setExpenseToDelete(exp.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                          title="Delete Expense Record"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -306,6 +309,19 @@ export const ExpensesView: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Delete Expense Modal */}
+      <ConfirmDeleteModal
+        isOpen={expenseToDelete !== null}
+        title="Permanently Delete Expense Record"
+        message="Are you sure you want to permanently delete this expense record? This action cannot be undone."
+        onConfirm={() => {
+          if (expenseToDelete) {
+            deleteExpense(expenseToDelete);
+            setExpenseToDelete(null);
+          }
+        }}
+        onCancel={() => setExpenseToDelete(null)}
+      />
     </div>
   );
 };

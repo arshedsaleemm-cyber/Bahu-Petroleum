@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard,
+  Bot,
   Truck,
   Droplet,
   Container,
@@ -45,6 +46,14 @@ export const Sidebar: React.FC = () => {
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    {
+      id: 'bahu_ai',
+      label: 'Bahu AI Assistant',
+      icon: Bot,
+      badge: 'PRO',
+      badgeColor: 'bg-emerald-600',
+      category: 'Executive AI Intelligence',
+    },
     { id: 'deliveries', label: 'Fuel Deliveries', icon: Truck, category: 'Fuel Operations' },
     { id: 'inventory', label: 'Fuel Inventory', icon: Droplet, category: 'Fuel Operations' },
     {

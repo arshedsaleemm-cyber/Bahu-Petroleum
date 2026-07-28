@@ -186,14 +186,20 @@ interface AppContextType {
   addExpenseCategory: (name: string) => void;
   addExpense: (data: Omit<Expense, 'id' | 'createdBy'>) => void;
   deleteExpense: (id: string) => void;
-  addBankAccount: (data: Omit<BankAccount, 'id' | 'currentBalance'>) => void;
+  addBankAccount: (data: Omit<BankAccount, 'id'>) => void;
+  deleteBankAccount: (id: string) => void;
   addBankTransaction: (data: Omit<BankTransaction, 'id' | 'createdBy'>) => void;
+  deleteUdhaarCustomer: (id: string) => void;
   updateCashRegister: (data: Partial<CashRegister>) => void;
   addCreditCardSale: (data: Omit<CreditCardTransaction, 'id'>) => void;
+  deleteCreditCardSale: (id: string) => void;
   addInfiniCardSale: (data: Omit<InfiniCardTransaction, 'id'>) => void;
+  deleteInfiniCardSale: (id: string) => void;
   updateShopData: (data: ShopModuleData) => void;
   addRentalAgreement: (data: Omit<RentalAgreement, 'id' | 'amountPaid' | 'pendingAmount' | 'status' | 'paymentHistory'>) => void;
+  deleteRentalAgreement: (id: string) => void;
   receiveRentPayment: (rentalId: string, amount: number, monthPaidFor: string, receiptNo: string) => void;
+  clearModuleData: (moduleKey: string) => void;
 
   // Sub-business actions
   addTyreShopService: (data: Omit<TyreShopService, 'id'>) => void;
@@ -460,6 +466,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const canManageUsers = isAdmin;
   const isLoggedIn = currentUser !== null;
 
+  const logAuditDelete = (moduleName: string, itemDetails: string) => {
+    const notif: AppNotification = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      title: `[AUDIT DELETE] ${moduleName}`,
+      message: `${currentUser?.name || 'Admin'} permanently deleted: ${itemDetails}`,
+      timestamp: new Date().toLocaleString(),
+      date: new Date().toISOString().slice(0, 10),
+      category: 'SYSTEM',
+      type: 'WARNING',
+      read: false,
+    };
+    setNotifications(prev => [notif, ...prev]);
+    syncSaveDoc('notifications', notif);
+  };
+
   // Authentication Logic
   const login = (identifier: string, pass: string, role?: UserRole, rememberDevice: boolean = false): boolean => {
     const cleanId = identifier.trim().toLowerCase();
@@ -660,8 +681,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteEmployee = (id: string) => {
+    if (!canDelete) return;
+    const emp = users.find(u => u.id === id);
     setUsers(prev => prev.filter(u => u.id !== id));
     syncDeleteDoc('users', id);
+    logAuditDelete('Employee User', emp?.name || id);
   };
 
   // Fuel Delivery Action
@@ -699,8 +723,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteDelivery = (id: string) => {
     if (!canDelete) return;
+    const del = deliveries.find(d => d.id === id);
     setDeliveries(prev => prev.filter(d => d.id !== id));
     syncDeleteDoc('deliveries', id);
+    logAuditDelete('Fuel Delivery', `${del?.fuelType || 'Fuel'} (Invoice #${del?.invoiceNo || id})`);
   };
 
   const addTank = (data: Omit<Tank, 'id'>) => {
@@ -717,8 +743,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteTank = (id: string) => {
     if (!canDelete) return;
+    const tank = tanks.find(t => t.id === id);
     setTanks(prev => prev.filter(t => t.id !== id));
     syncDeleteDoc('tanks', id);
+    logAuditDelete('Tank Unit', tank?.name || id);
   };
 
   // Lubricants
@@ -912,15 +940,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteExpense = (id: string) => {
     if (!canDelete) return;
+    const exp = expenses.find(e => e.id === id);
     setExpenses(prev => prev.filter(e => e.id !== id));
     syncDeleteDoc('expenses', id);
+    logAuditDelete('Expense Record', `${exp?.category || 'Expense'} (Rs. ${exp?.amount || 0})`);
   };
 
   // Bank
-  const addBankAccount = (data: Omit<BankAccount, 'id' | 'currentBalance'>) => {
-    const newBank: BankAccount = { ...data, id: `bank-${Date.now()}`, currentBalance: 0 };
+  const addBankAccount = (data: Omit<BankAccount, 'id'>) => {
+    const newBank: BankAccount = { ...data, id: `bank-${Date.now()}`, currentBalance: data.currentBalance || 0 };
     setBankAccounts(prev => [...prev, newBank]);
     syncSaveDoc('bankAccounts', newBank);
+  };
+
+  const deleteBankAccount = (id: string) => {
+    if (!canDelete) return;
+    const bank = bankAccounts.find(b => b.id === id);
+    setBankAccounts(prev => prev.filter(b => b.id !== id));
+    syncDeleteDoc('bankAccounts', id);
+    logAuditDelete('Bank Account', bank?.bankName || id);
+  };
+
+  const deleteUdhaarCustomer = (id: string) => {
+    if (!canDelete) return;
+    const cust = udhaarCustomers.find(c => c.id === id);
+    setUdhaarCustomers(prev => prev.filter(c => c.id !== id));
+    syncDeleteDoc('udhaarCustomers', id);
+    logAuditDelete('Udhaar Customer', cust?.customerName || cust?.name || id);
   };
 
   const addBankTransaction = (data: Omit<BankTransaction, 'id' | 'createdBy'>) => {
@@ -955,10 +1001,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncSaveDoc('creditCardSales', newTx);
   };
 
+  const deleteCreditCardSale = (id: string) => {
+    if (!canDelete) return;
+    const sale = creditCardSales.find(c => c.id === id);
+    setCreditCardSales(prev => prev.filter(c => c.id !== id));
+    syncDeleteDoc('creditCardSales', id);
+    logAuditDelete('Credit Card Sale', `Rs. ${sale?.amount || 0}`);
+  };
+
   const addInfiniCardSale = (data: Omit<InfiniCardTransaction, 'id'>) => {
     const newTx: InfiniCardTransaction = { ...data, id: `inf-${Date.now()}` };
     setInfiniCardSales(prev => [newTx, ...prev]);
     syncSaveDoc('infiniCardSales', newTx);
+  };
+
+  const deleteInfiniCardSale = (id: string) => {
+    if (!canDelete) return;
+    const sale = infiniCardSales.find(s => s.id === id);
+    setInfiniCardSales(prev => prev.filter(s => s.id !== id));
+    syncDeleteDoc('infiniCardSales', id);
+    logAuditDelete('Infini Card Sale', `Rs. ${sale?.amount || 0}`);
   };
 
   const updateShopData = (data: ShopModuleData) => {
@@ -981,6 +1043,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncSaveDoc('rentalAgreements', newRental);
   };
 
+  const deleteRentalAgreement = (id: string) => {
+    if (!canDelete) return;
+    const rent = rentalAgreements.find(r => r.id === id);
+    setRentalAgreements(prev => prev.filter(r => r.id !== id));
+    syncDeleteDoc('rentalAgreements', id);
+    logAuditDelete('Rental Agreement', rent?.tenantName || id);
+  };
+
+  const clearModuleData = (moduleKey: string) => {
+    if (!canDelete) return;
+    logAuditDelete(`Module Section [${moduleKey}]`, `Entire section cleared by Admin`);
+    if (moduleKey === 'tanks') { tanks.forEach(t => syncDeleteDoc('tanks', t.id)); setTanks([]); }
+    else if (moduleKey === 'deliveries') { deliveries.forEach(d => syncDeleteDoc('deliveries', d.id)); setDeliveries([]); }
+    else if (moduleKey === 'workers') { workers.forEach(w => syncDeleteDoc('workers', w.id)); setWorkers([]); setSalaries([]); }
+    else if (moduleKey === 'expenses') { expenses.forEach(e => syncDeleteDoc('expenses', e.id)); setExpenses([]); }
+    else if (moduleKey === 'bankAccounts') { bankAccounts.forEach(b => syncDeleteDoc('bankAccounts', b.id)); setBankAccounts([]); }
+    else if (moduleKey === 'udhaarCustomers') { udhaarCustomers.forEach(c => syncDeleteDoc('udhaarCustomers', c.id)); setUdhaarCustomers([]); }
+    else if (moduleKey === 'lubricants') { lubricants.forEach(l => syncDeleteDoc('lubricants', l.id)); setLubricants([]); }
+    else if (moduleKey === 'creditCardSales') { creditCardSales.forEach(c => syncDeleteDoc('creditCardSales', c.id)); setCreditCardSales([]); }
+    else if (moduleKey === 'infiniCardSales') { infiniCardSales.forEach(s => syncDeleteDoc('infiniCardSales', s.id)); setInfiniCardSales([]); }
+    else if (moduleKey === 'rentalAgreements') { rentalAgreements.forEach(r => syncDeleteDoc('rentalAgreements', r.id)); setRentalAgreements([]); }
+    else if (moduleKey === 'dailySalesEntries') { dailySalesEntries.forEach(d => syncDeleteDoc('dailySalesEntries', d.id)); setDailySalesEntries([]); }
+  };
+
   const receiveRentPayment = (rentalId: string, amount: number, monthPaidFor: string, receiptNo: string) => {
     setRentalAgreements(prev =>
       prev.map(r => {
@@ -991,7 +1077,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...r,
             amountPaid: newPaid,
             pendingAmount: pending,
-            status: pending === 0 ? 'Paid' : 'Pending',
+            status: (pending === 0 ? 'Paid' : 'Pending') as 'Paid' | 'Pending' | 'Overdue',
             paymentHistory: [
               {
                 id: `rph-${Date.now()}`,
@@ -1475,13 +1561,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addExpense,
         deleteExpense,
         addBankAccount,
+        deleteBankAccount,
         addBankTransaction,
+        deleteUdhaarCustomer,
         updateCashRegister,
         addCreditCardSale,
+        deleteCreditCardSale,
         addInfiniCardSale,
+        deleteInfiniCardSale,
         updateShopData,
         addRentalAgreement,
+        deleteRentalAgreement,
         receiveRentPayment,
+        clearModuleData,
         addTyreShopService,
         deleteTyreShopService,
         addCarWashService,

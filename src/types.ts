@@ -24,6 +24,7 @@ export interface FuelDelivery {
   dieselLiters: number;
   supplierName: string;
   invoiceNumber: string;
+  invoiceNo?: string;
   vehicleNumber?: string;
   driverName?: string;
   totalLitersReceived: number;
@@ -48,6 +49,7 @@ export interface FuelDelivery {
 export interface Tank {
   id: string;
   tankName: string;
+  name?: string;
   fuelType: 'Petrol' | 'Diesel';
   capacity: number; // in Liters
   currentFuel: number; // in Liters
@@ -132,6 +134,7 @@ export interface UdhaarTransaction {
 export interface UdhaarCustomer {
   id: string;
   customerName: string;
+  name?: string;
   phoneNumber: string;
   vehicleNumber: string;
   address: string;
@@ -169,6 +172,10 @@ export interface BankAccount {
   accountNumber: string;
   accountTitle: string;
   currentBalance: number;
+  iban?: string;
+  branchName?: string;
+  branchCode?: string;
+  transactions?: BankTransaction[];
 }
 
 export interface BankTransaction {
@@ -191,6 +198,7 @@ export interface CashRegister {
   closingCash: number;
   cashReceived: number;
   cashBalance: number;
+  totalCashOnHand?: number;
   notes?: string;
 }
 
@@ -303,6 +311,7 @@ export interface AppNotification {
   type: 'WARNING' | 'INFO' | 'ALERT' | 'SUCCESS';
   category: 'STOCK' | 'RENT' | 'SALARY' | 'BILL' | 'SYSTEM' | 'DELIVERY';
   date: string;
+  timestamp?: string;
   read: boolean;
 }
 

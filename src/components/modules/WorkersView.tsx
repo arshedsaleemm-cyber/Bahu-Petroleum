@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Worker } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 import { UserCheck, Plus, Search, Phone, CreditCard, MapPin, Calendar, Trash2, X, Edit2 } from 'lucide-react';
 
 export const WorkersView: React.FC = () => {
@@ -11,6 +12,7 @@ export const WorkersView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [workerToDelete, setWorkerToDelete] = useState<string | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -200,8 +202,9 @@ export const WorkersView: React.FC = () => {
                 )}
                 {canDelete && (
                   <button
-                    onClick={() => deleteWorker(worker.id)}
-                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white text-slate-600 transition-all"
+                    onClick={() => setWorkerToDelete(worker.id)}
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white text-slate-600 transition-all cursor-pointer"
+                    title="Delete Worker Profile"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -334,6 +337,19 @@ export const WorkersView: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={workerToDelete !== null}
+        title="Permanently Delete Worker Profile"
+        message="Are you sure you want to permanently delete this worker profile? Associated salary and attendance records will also be cleaned up."
+        onConfirm={() => {
+          if (workerToDelete) {
+            deleteWorker(workerToDelete);
+            setWorkerToDelete(null);
+          }
+        }}
+        onCancel={() => setWorkerToDelete(null)}
+      />
     </div>
   );
 };

@@ -77,19 +77,27 @@ export const Header: React.FC = () => {
           <button
             onClick={triggerManualSync}
             disabled={syncStatus.syncing}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-blue-900/40 hover:bg-blue-900/80 text-blue-200 border border-blue-800/80 text-xs transition-all"
-            title="Cloud Sync Status - Click to sync"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-900/60 hover:bg-blue-900 text-white border border-blue-800 text-xs transition-all cursor-pointer"
+            title={syncStatus.syncing ? "Auto Syncing in background..." : syncStatus.online ? "Online - Cloud Live Sync Active" : "Offline Mode - Data saved locally & will auto-sync"}
           >
             {syncStatus.syncing ? (
-              <RefreshCw className="w-3.5 h-3.5 text-blue-300 animate-spin" />
+              <>
+                <RefreshCw className="w-3.5 h-3.5 text-blue-300 animate-spin shrink-0" />
+                <span className="text-[11px] font-bold text-blue-200">🔄 Syncing</span>
+              </>
             ) : syncStatus.online ? (
-              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <Wifi className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="text-[11px] font-bold text-emerald-300">🟢 Online</span>
+              </>
             ) : (
-              <WifiOff className="w-3.5 h-3.5 text-amber-400" />
+              <>
+                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                <WifiOff className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                <span className="text-[11px] font-bold text-red-300">🔴 Offline</span>
+              </>
             )}
-            <span className="hidden sm:inline text-[11px] font-medium">
-              {syncStatus.syncing ? 'Syncing...' : syncStatus.online ? 'Synced' : 'Offline'}
-            </span>
           </button>
 
           {/* Notifications Bell */}

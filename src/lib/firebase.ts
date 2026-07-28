@@ -1,12 +1,41 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInAnonymously,
+  onAuthStateChanged,
+  signOut as firebaseSignOut,
+} from 'firebase/auth';
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  enableMultiTabIndexedDbPersistence,
+  enableIndexedDbPersistence,
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Enable offline multi-tab persistence for real-time offline support
+try {
+  enableMultiTabIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      enableIndexedDbPersistence(db).catch((e) => {
+        console.warn('Firestore single tab persistence notice:', e);
+      });
+    } else if (err.code === 'unimplemented') {
+      console.warn('Firestore persistence not supported in this environment');
+    }
+  });
+} catch (e) {
+  console.warn('Firestore persistence setup warning:', e);
+}
 
 export async function testFirestoreConnection(): Promise<boolean> {
   try {
@@ -17,6 +46,14 @@ export async function testFirestoreConnection(): Promise<boolean> {
     return false;
   }
 }
+
+export {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInAnonymously,
+  onAuthStateChanged,
+  firebaseSignOut,
+};
 
 export enum OperationType {
   CREATE = 'create',
@@ -64,3 +101,4 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
+

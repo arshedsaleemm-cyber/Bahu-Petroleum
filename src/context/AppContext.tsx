@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { testFirestoreConnection } from '../lib/firebase';
+import {
+  testFirestoreConnection,
+  auth,
+  firebaseSignOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInAnonymously,
+  onAuthStateChanged,
+} from '../lib/firebase';
 import { simpleHashPassword, verifyPassword, generateOTP } from '../utils/security';
 import {
   subscribeToCollection,
@@ -315,46 +323,85 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }
 
+  // Network & Online Status Listeners for Real-time Cloud Sync
+  useEffect(() => {
+    const handleOnline = () => {
+      setSyncStatus(prev => ({ ...prev, online: true, lastSyncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }));
+    };
+    const handleOffline = () => {
+      setSyncStatus(prev => ({ ...prev, online: false }));
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Ensure Firebase Auth session listener is active
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setSyncStatus(prev => ({ ...prev, online: true, lastSyncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }));
+      }
+    });
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      unsubAuth();
+    };
+  }, []);
+
   // Real-time Firestore Subscriptions
   useEffect(() => {
     testFirestoreConnection();
 
+    const updateSyncTime = () => {
+      setSyncStatus(prev => ({
+        ...prev,
+        online: true,
+        lastSyncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }));
+    };
+
+    const wrapSetter = <T,>(setter: React.Dispatch<React.SetStateAction<T>>) => (val: T) => {
+      setter(val);
+      updateSyncTime();
+    };
+
     const unsubs: (() => void)[] = [];
 
-    unsubs.push(subscribeToCollection<User>('users', setUsers, initialUsers));
-    unsubs.push(subscribeToCollection<Tank>('tanks', setTanks, initialTanks));
-    unsubs.push(subscribeToCollection<FuelDelivery>('deliveries', setDeliveries, initialDeliveries));
-    unsubs.push(subscribeToCollection<LubricantProduct>('lubricants', setLubricants, initialLubricants));
-    unsubs.push(subscribeToCollection<Worker>('workers', setWorkers, initialWorkers));
-    unsubs.push(subscribeToCollection<AttendanceRecord>('attendance', setAttendance, initialAttendance));
-    unsubs.push(subscribeToCollection<SalaryRecord>('salaries', setSalaries, initialSalaries));
-    unsubs.push(subscribeToCollection<UdhaarCustomer>('udhaarCustomers', setUdhaarCustomers, initialUdhaarCustomers));
-    unsubs.push(subscribeToCollection<ExpenseCategory>('categories', setCategories, initialCategories));
-    unsubs.push(subscribeToCollection<Expense>('expenses', setExpenses, initialExpenses));
-    unsubs.push(subscribeToCollection<BankAccount>('bankAccounts', setBankAccounts, initialBankAccounts));
-    unsubs.push(subscribeToCollection<BankTransaction>('bankTransactions', setBankTransactions, initialBankTransactions));
-    unsubs.push(subscribeToDoc<CashRegister>('singletons/cashRegister', setCashRegister, initialCashRegister));
-    unsubs.push(subscribeToCollection<CreditCardTransaction>('creditCardSales', setCreditCardSales, initialCreditCardSales));
-    unsubs.push(subscribeToCollection<InfiniCardTransaction>('infiniCardSales', setInfiniCardSales, initialInfiniCardSales));
-    unsubs.push(subscribeToCollection<ShopModuleData>('shops', setShops, initialShops));
-    unsubs.push(subscribeToCollection<RentalAgreement>('rentalAgreements', setRentalAgreements, initialRentalAgreements));
-    unsubs.push(subscribeToCollection<AppNotification>('notifications', setNotifications, initialNotifications));
+    unsubs.push(subscribeToCollection<User>('users', wrapSetter(setUsers), initialUsers));
+    unsubs.push(subscribeToCollection<Tank>('tanks', wrapSetter(setTanks), initialTanks));
+    unsubs.push(subscribeToCollection<FuelDelivery>('deliveries', wrapSetter(setDeliveries), initialDeliveries));
+    unsubs.push(subscribeToCollection<LubricantProduct>('lubricants', wrapSetter(setLubricants), initialLubricants));
+    unsubs.push(subscribeToCollection<Worker>('workers', wrapSetter(setWorkers), initialWorkers));
+    unsubs.push(subscribeToCollection<AttendanceRecord>('attendance', wrapSetter(setAttendance), initialAttendance));
+    unsubs.push(subscribeToCollection<SalaryRecord>('salaries', wrapSetter(setSalaries), initialSalaries));
+    unsubs.push(subscribeToCollection<UdhaarCustomer>('udhaarCustomers', wrapSetter(setUdhaarCustomers), initialUdhaarCustomers));
+    unsubs.push(subscribeToCollection<ExpenseCategory>('categories', wrapSetter(setCategories), initialCategories));
+    unsubs.push(subscribeToCollection<Expense>('expenses', wrapSetter(setExpenses), initialExpenses));
+    unsubs.push(subscribeToCollection<BankAccount>('bankAccounts', wrapSetter(setBankAccounts), initialBankAccounts));
+    unsubs.push(subscribeToCollection<BankTransaction>('bankTransactions', wrapSetter(setBankTransactions), initialBankTransactions));
+    unsubs.push(subscribeToDoc<CashRegister>('singletons/cashRegister', wrapSetter(setCashRegister), initialCashRegister));
+    unsubs.push(subscribeToCollection<CreditCardTransaction>('creditCardSales', wrapSetter(setCreditCardSales), initialCreditCardSales));
+    unsubs.push(subscribeToCollection<InfiniCardTransaction>('infiniCardSales', wrapSetter(setInfiniCardSales), initialInfiniCardSales));
+    unsubs.push(subscribeToCollection<ShopModuleData>('shops', wrapSetter(setShops), initialShops));
+    unsubs.push(subscribeToCollection<RentalAgreement>('rentalAgreements', wrapSetter(setRentalAgreements), initialRentalAgreements));
+    unsubs.push(subscribeToCollection<AppNotification>('notifications', wrapSetter(setNotifications), initialNotifications));
 
-    unsubs.push(subscribeToCollection<TyreShopService>('tyreShopServices', setTyreShopServices, initialTyreServices));
-    unsubs.push(subscribeToCollection<CarWashService>('carWashServices', setCarWashServices, initialCarWashServices));
-    unsubs.push(subscribeToCollection<TuckShopItem>('tuckShopItems', setTuckShopItems, initialTuckShopItems));
+    unsubs.push(subscribeToCollection<TyreShopService>('tyreShopServices', wrapSetter(setTyreShopServices), initialTyreServices));
+    unsubs.push(subscribeToCollection<CarWashService>('carWashServices', wrapSetter(setCarWashServices), initialCarWashServices));
+    unsubs.push(subscribeToCollection<TuckShopItem>('tuckShopItems', wrapSetter(setTuckShopItems), initialTuckShopItems));
 
-    unsubs.push(subscribeToCollection<RestaurantSale>('restaurantSales', setRestaurantSales, initialRestaurantSales));
-    unsubs.push(subscribeToCollection<RestaurantExpense>('restaurantExpenses', setRestaurantExpenses, initialRestaurantExpenses));
-    unsubs.push(subscribeToCollection<RestaurantStaff>('restaurantStaff', setRestaurantStaff, initialRestaurantStaff));
-    unsubs.push(subscribeToCollection<RestaurantAttendance>('restaurantAttendance', setRestaurantAttendance, initialRestaurantAttendance));
-    unsubs.push(subscribeToCollection<RestaurantSalaryRecord>('restaurantSalaries', setRestaurantSalaries, initialRestaurantSalaries));
-    unsubs.push(subscribeToCollection<RestaurantSupplier>('restaurantSuppliers', setRestaurantSuppliers, initialRestaurantSuppliers));
-    unsubs.push(subscribeToCollection<RestaurantKitchenInventory>('restaurantInventory', setRestaurantInventory, initialRestaurantInventory));
-    unsubs.push(subscribeToCollection<RestaurantPurchase>('restaurantPurchases', setRestaurantPurchases, initialRestaurantPurchases));
-    unsubs.push(subscribeToCollection<RestaurantDeposit>('restaurantDeposits', setRestaurantDeposits, initialRestaurantDeposits));
+    unsubs.push(subscribeToCollection<RestaurantSale>('restaurantSales', wrapSetter(setRestaurantSales), initialRestaurantSales));
+    unsubs.push(subscribeToCollection<RestaurantExpense>('restaurantExpenses', wrapSetter(setRestaurantExpenses), initialRestaurantExpenses));
+    unsubs.push(subscribeToCollection<RestaurantStaff>('restaurantStaff', wrapSetter(setRestaurantStaff), initialRestaurantStaff));
+    unsubs.push(subscribeToCollection<RestaurantAttendance>('restaurantAttendance', wrapSetter(setRestaurantAttendance), initialRestaurantAttendance));
+    unsubs.push(subscribeToCollection<RestaurantSalaryRecord>('restaurantSalaries', wrapSetter(setRestaurantSalaries), initialRestaurantSalaries));
+    unsubs.push(subscribeToCollection<RestaurantSupplier>('restaurantSuppliers', wrapSetter(setRestaurantSuppliers), initialRestaurantSuppliers));
+    unsubs.push(subscribeToCollection<RestaurantKitchenInventory>('restaurantInventory', wrapSetter(setRestaurantInventory), initialRestaurantInventory));
+    unsubs.push(subscribeToCollection<RestaurantPurchase>('restaurantPurchases', wrapSetter(setRestaurantPurchases), initialRestaurantPurchases));
+    unsubs.push(subscribeToCollection<RestaurantDeposit>('restaurantDeposits', wrapSetter(setRestaurantDeposits), initialRestaurantDeposits));
 
-    unsubs.push(subscribeToCollection<DailySalesEntry>('dailySalesEntries', setDailySalesEntries, initialDailySalesEntries));
+    unsubs.push(subscribeToCollection<DailySalesEntry>('dailySalesEntries', wrapSetter(setDailySalesEntries), initialDailySalesEntries));
 
     return () => {
       unsubs.forEach(unsub => unsub());
@@ -443,6 +490,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       setCurrentUser(matched);
 
+      // Sign in to Firebase Auth in background to establish live Auth token
+      if (!auth.currentUser) {
+        signInAnonymously(auth).catch((e) => console.warn('Firebase auth session notice:', e));
+      }
+
       if (rememberDevice) {
         localStorage.setItem(TRUSTED_DEVICE_KEY, 'true');
         localStorage.setItem(TRUSTED_USER_KEY, JSON.stringify(matched));
@@ -458,6 +510,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const adminUser = users.find(u => u.role === 'ADMIN') || initialUsers[0];
       if (verifyPassword(pass, adminUser.password)) {
         setCurrentUser(adminUser);
+        if (!auth.currentUser) {
+          signInAnonymously(auth).catch((e) => console.warn('Firebase auth session notice:', e));
+        }
         if (rememberDevice) {
           localStorage.setItem(TRUSTED_DEVICE_KEY, 'true');
           localStorage.setItem(TRUSTED_USER_KEY, JSON.stringify(adminUser));
@@ -474,6 +529,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logout = () => {
     setCurrentUser(null);
+    firebaseSignOut(auth).catch(e => console.warn('Firebase signOut notice:', e));
     localStorage.removeItem(TRUSTED_DEVICE_KEY);
     localStorage.removeItem(TRUSTED_USER_KEY);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_currentUser`);

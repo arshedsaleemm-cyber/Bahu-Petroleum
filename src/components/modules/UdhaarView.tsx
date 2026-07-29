@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { UdhaarCustomer } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
+import { PDFExportButton } from '../common/PDFExportButton';
 import { Users, Plus, Search, Phone, Truck, CreditCard, DollarSign, X, History, ChevronRight } from 'lucide-react';
 
 export const UdhaarView: React.FC = () => {
@@ -83,12 +84,14 @@ export const UdhaarView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" /> Add Udhaar Customer
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={openAddModal}
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Add Udhaar Customer
+          </button>
+        </div>
       </div>
 
       {/* Search */}

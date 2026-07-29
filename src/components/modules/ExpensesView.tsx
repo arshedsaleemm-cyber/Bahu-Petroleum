@@ -4,6 +4,7 @@ import { Expense } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
+import { PDFExportButton } from '../common/PDFExportButton';
 import { Receipt, Plus, Search, Tag, Calendar, Trash2, X, Paperclip } from 'lucide-react';
 
 export const ExpensesView: React.FC = () => {
@@ -90,13 +91,13 @@ export const ExpensesView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setIsCategoryModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all"
+            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <Tag className="w-4 h-4 text-blue-600" /> Custom Category
           </button>
           <button
             onClick={openAddModal}
-            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all"
+            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Add Expense
           </button>

@@ -5,6 +5,7 @@ import { formatCurrency, formatLiters, formatDate } from '../../utils/formatters
 import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
 import { PermissionNotice } from '../common/PermissionNotice';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
+import { PDFExportButton } from '../common/PDFExportButton';
 import {
   Truck,
   Plus,
@@ -151,20 +152,14 @@ export const FuelDeliveriesView: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={handleExportPDF}
-            className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all"
-          >
-            <FileText className="w-4 h-4 text-red-600" /> Export Shortage PDF
-          </button>
-          <button
             onClick={handleExportExcel}
-            className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all"
+            className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all"
+            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Verify & Log Delivery
           </button>

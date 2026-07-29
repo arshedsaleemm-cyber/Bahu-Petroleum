@@ -1,50 +1,21 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency, formatLiters, formatDate } from '../../utils/formatters';
-import { exportToPDF, exportToExcel, exportToCSV } from '../../utils/exportUtils';
+import { exportToExcel } from '../../utils/exportUtils';
 import { PermissionNotice } from '../common/PermissionNotice';
-import { FileText, FileSpreadsheet, Download, Calendar, Filter, PieChart, BarChart3, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { ReportsPDFCenter } from './ReportsPDFCenter';
+import { FileText, FileSpreadsheet, PieChart, BarChart3, Download } from 'lucide-react';
 
 export const ReportsView: React.FC = () => {
-  const { deliveries, expenses, udhaarCustomers, workers, dailySalesEntries } = useApp();
+  const { deliveries, expenses, udhaarCustomers, dailySalesEntries } = useApp();
 
+  const [activeTab, setActiveTab] = useState<'PDF_CENTER' | 'LOGS'>('PDF_CENTER');
   const [reportType, setReportType] = useState<string>('DAILY_SALES');
-  const [dateRange, setDateRange] = useState<string>('THIS_MONTH');
 
   const totalDailySalesAmount = (dailySalesEntries || []).reduce((acc, curr) => acc + curr.totalSales, 0);
   const totalDeliveriesCost = deliveries.reduce((acc, curr) => acc + curr.totalPurchaseAmount, 0);
   const totalExpensesAmount = expenses.reduce((acc, curr) => acc + curr.amount, 0);
-  const totalUdhaarOutstanding = udhaarCustomers.reduce((acc, curr) => acc + curr.remainingBalance, 0);
   const netProfit = totalDailySalesAmount - totalDeliveriesCost - totalExpensesAmount;
-
-  const handleExportPDF = () => {
-    if (reportType === 'DAILY_SALES') {
-      const headers = ['Date', 'Business Section', 'Total Daily Sales', 'Recorded By', 'Notes'];
-      const rows = (dailySalesEntries || []).map(e => [
-        e.date,
-        e.section,
-        `Rs. ${e.totalSales.toLocaleString()}`,
-        e.createdBy || 'Admin',
-        e.notes || '-',
-      ]);
-      exportToPDF('Bahu Petroleum - Daily Cash & Card Sales Report', headers, rows, 'Daily_Sales_Report');
-    } else if (reportType === 'DELIVERIES') {
-      const headers = ['Date', 'Supplier', 'Invoice', 'Fuel Type', 'Quantity', 'Amount'];
-      const rows = deliveries.map(d => [
-        d.deliveryDate,
-        d.supplierName,
-        d.invoiceNumber,
-        d.fuelType,
-        `${d.totalLitersReceived} L`,
-        `Rs.${d.totalPurchaseAmount}`,
-      ]);
-      exportToPDF('Bahu Petroleum - Fuel Deliveries Report', headers, rows, 'Fuel_Deliveries_Report');
-    } else {
-      const headers = ['Expense Title', 'Category', 'Date', 'Amount'];
-      const rows = expenses.map(e => [e.title, e.category, e.date, `Rs.${e.amount}`]);
-      exportToPDF('Bahu Petroleum - Expenses Statement', headers, rows, 'Expenses_Report');
-    }
-  };
 
   const handleExportExcel = () => {
     if (reportType === 'DAILY_SALES') {
@@ -76,14 +47,8 @@ export const ReportsView: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={handleExportPDF}
-            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all"
-          >
-            <FileText className="w-4 h-4" /> Download PDF Report
-          </button>
-          <button
             onClick={handleExportExcel}
-            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all"
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4" /> Export Excel
           </button>
@@ -121,97 +86,124 @@ export const ReportsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Report Selector Tabs */}
-      <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+      {/* Main Tab Switcher */}
+      <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
         <button
-          onClick={() => setReportType('DAILY_SALES')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            reportType === 'DAILY_SALES' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+          onClick={() => setActiveTab('PDF_CENTER')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+            activeTab === 'PDF_CENTER' ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          Daily Cash & Card Sales
+          📄 1-Click PDF Center
         </button>
         <button
-          onClick={() => setReportType('DELIVERIES')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            reportType === 'DELIVERIES' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+          onClick={() => setActiveTab('LOGS')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+            activeTab === 'LOGS' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          Tanker Deliveries
-        </button>
-        <button
-          onClick={() => setReportType('EXPENSES')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            reportType === 'EXPENSES' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          Expenses & Bills
+          📋 Quick Data Logs
         </button>
       </div>
 
-      {/* Report Table View */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-        <h3 className="font-extrabold text-slate-900 text-base">
-          {reportType === 'DAILY_SALES'
-            ? 'Daily Cash & Card Sales Summary Log'
-            : reportType === 'DELIVERIES'
-            ? 'Fuel Tanker Shipments Log'
-            : 'Expense Vouchers Log'}
-        </h3>
+      {/* TAB CONTENT: PDF CENTER */}
+      {activeTab === 'PDF_CENTER' && <ReportsPDFCenter />}
 
-        {reportType === 'DAILY_SALES' && (
-          <div className="space-y-2">
-            {(dailySalesEntries || []).map(entry => (
-              <div key={entry.id} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-slate-900">{entry.section}</span>
-                    <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-md">
-                      {entry.date}
-                    </span>
+      {/* TAB CONTENT: DATA LOGS */}
+      {activeTab === 'LOGS' && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+            <button
+              onClick={() => setReportType('DAILY_SALES')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                reportType === 'DAILY_SALES' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Daily Cash & Card Sales
+            </button>
+            <button
+              onClick={() => setReportType('DELIVERIES')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                reportType === 'DELIVERIES' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Tanker Deliveries
+            </button>
+            <button
+              onClick={() => setReportType('EXPENSES')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                reportType === 'EXPENSES' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Expenses & Bills
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <h3 className="font-extrabold text-slate-900 text-base">
+              {reportType === 'DAILY_SALES'
+                ? 'Daily Cash & Card Sales Summary Log'
+                : reportType === 'DELIVERIES'
+                ? 'Fuel Tanker Shipments Log'
+                : 'Expense Vouchers Log'}
+            </h3>
+
+            {reportType === 'DAILY_SALES' && (
+              <div className="space-y-2">
+                {(dailySalesEntries || []).map(entry => (
+                  <div key={entry.id} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-slate-900">{entry.section}</span>
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-md">
+                          {entry.date}
+                        </span>
+                      </div>
+                      {entry.notes && <p className="text-[11px] text-slate-500 mt-0.5">{entry.notes}</p>}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-blue-900 text-sm">Rs. {entry.totalSales.toLocaleString()}</p>
+                      <p className="text-[10px] text-slate-400">Recorded by {entry.createdBy || 'Admin'}</p>
+                    </div>
                   </div>
-                  {entry.notes && <p className="text-[11px] text-slate-500 mt-0.5">{entry.notes}</p>}
-                </div>
-                <div className="text-right">
-                  <p className="font-black text-blue-900 text-sm">Rs. {entry.totalSales.toLocaleString()}</p>
-                  <p className="text-[10px] text-slate-400">Recorded by {entry.createdBy || 'Admin'}</p>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {reportType === 'DELIVERIES' && (
-          <div className="space-y-2">
-            {deliveries.map(d => (
-              <div key={d.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                <div>
-                  <p className="font-bold text-slate-900">{d.supplierName} ({d.fuelType})</p>
-                  <p className="text-[11px] text-slate-500">Invoice: {d.invoiceNumber} • Vehicle: {d.vehicleNumber}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-black text-red-600">{formatCurrency(d.totalPurchaseAmount)}</p>
-                  <p className="text-[11px] text-slate-500">{formatLiters(d.totalLitersReceived)}</p>
-                </div>
+            {reportType === 'DELIVERIES' && (
+              <div className="space-y-2">
+                {deliveries.map(d => (
+                  <div key={d.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                    <div>
+                      <p className="font-bold text-slate-900">{d.supplierName} ({d.fuelType})</p>
+                      <p className="text-[11px] text-slate-500">Invoice: {d.invoiceNumber} • Vehicle: {d.vehicleNumber}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-red-600">{formatCurrency(d.totalPurchaseAmount)}</p>
+                      <p className="text-[11px] text-slate-500">{formatLiters(d.totalLitersReceived)}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {reportType === 'EXPENSES' && (
-          <div className="space-y-2">
-            {expenses.map(e => (
-              <div key={e.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                <div>
-                  <p className="font-bold text-slate-900">{e.title}</p>
-                  <p className="text-[11px] text-slate-500">{e.category} • {formatDate(e.date)}</p>
-                </div>
-                <p className="font-black text-amber-700">{formatCurrency(e.amount)}</p>
+            {reportType === 'EXPENSES' && (
+              <div className="space-y-2">
+                {expenses.map(e => (
+                  <div key={e.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                    <div>
+                      <p className="font-bold text-slate-900">{e.title}</p>
+                      <p className="text-[11px] text-slate-500">{e.category} • {formatDate(e.date)}</p>
+                    </div>
+                    <p className="font-black text-amber-700">{formatCurrency(e.amount)}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
+

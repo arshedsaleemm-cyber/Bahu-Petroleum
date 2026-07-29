@@ -4,6 +4,7 @@ import { BankAccount } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
+import { PDFExportButton } from '../common/PDFExportButton';
 import { Building2, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw, Wallet, X, ShieldCheck, Trash2 } from 'lucide-react';
 
 export const BankView: React.FC = () => {
@@ -77,12 +78,14 @@ export const BankView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddAccountModalOpen(true)}
-          className="px-4 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" /> Add Bank Account
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => setIsAddAccountModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Add Bank Account
+          </button>
+        </div>
       </div>
 
       {/* Financial Overview Cards */}

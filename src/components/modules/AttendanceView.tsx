@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { AttendanceStatus } from '../../types';
 import { formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
+import { PDFExportButton } from '../common/PDFExportButton';
 import { CalendarCheck, Check, X, Clock, AlertCircle, Calendar } from 'lucide-react';
 
 export const AttendanceView: React.FC = () => {
@@ -44,14 +45,16 @@ export const AttendanceView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-slate-500" />
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 outline-none focus:border-blue-600"
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-slate-500" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 outline-none focus:border-blue-600"
+            />
+          </div>
         </div>
       </div>
 

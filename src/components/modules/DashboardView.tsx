@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { formatCurrency, formatLiters } from '../../utils/formatters';
 import { TankVisualizer } from '../common/TankVisualizer';
 import { PermissionNotice } from '../common/PermissionNotice';
+import { PDFExportButton } from '../common/PDFExportButton';
 import {
   TrendingUp,
   DollarSign,
@@ -142,16 +143,16 @@ export const DashboardView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setCurrentView('daily_petrol_cash')}
-            className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 transition-all"
+            className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Daily Petrol Cash
           </button>
           <button
             onClick={() => setCurrentView('deliveries')}
-            className="px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 transition-all"
+            className="px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <Truck className="w-4 h-4" /> Add Fuel Delivery
           </button>

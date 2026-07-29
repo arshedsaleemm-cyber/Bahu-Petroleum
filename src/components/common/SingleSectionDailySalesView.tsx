@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { DailySalesEntry, DailySalesSection } from '../../types';
 import { PermissionNotice } from './PermissionNotice';
 import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
+import { PDFExportButton } from './PDFExportButton';
 import {
   DollarSign,
   Plus,
@@ -240,21 +241,14 @@ export const SingleSectionDailySalesView: React.FC<SingleSectionDailySalesViewPr
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleExportExcel}
-            className="px-3 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
+            className="px-3 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             title="Export Excel"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel
           </button>
           <button
-            onClick={handleExportPDF}
-            className="px-3 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
-            title="Export PDF"
-          >
-            <Download className="w-4 h-4 text-slate-500" /> PDF
-          </button>
-          <button
             onClick={handleOpenAddModal}
-            className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs shadow-md flex items-center gap-2 transition-all"
+            className="px-4 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Add Daily Sales Entry
           </button>

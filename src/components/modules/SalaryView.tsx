@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { SalaryRecord, Worker } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
+import { PDFExportButton } from '../common/PDFExportButton';
 import { Banknote, Plus, History, DollarSign, X, CheckCircle } from 'lucide-react';
 
 export const SalaryView: React.FC = () => {
@@ -53,13 +54,13 @@ export const SalaryView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setIsAdvanceModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all"
+            className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Issue Salary Advance
           </button>
           <button
             onClick={() => setIsPayModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all"
+            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
           >
             <DollarSign className="w-4 h-4" /> Pay Monthly Salary
           </button>

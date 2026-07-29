@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   testFirestoreConnection,
   auth,
@@ -448,6 +448,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => saveLocal('dailySalesEntries', dailySalesEntries), [dailySalesEntries]);
   useEffect(() => saveLocal('restaurantPurchases', restaurantPurchases), [restaurantPurchases]);
   useEffect(() => saveLocal('restaurantDeposits', restaurantDeposits), [restaurantDeposits]);
+
+  // Automated Monthly and Yearly Report Availability Notifications Trigger
+  const notifsCheckedRef = useRef(false);
+
+  useEffect(() => {
+    if (notifsCheckedRef.current || notifications.length === 0) return;
+
+    const today = new Date();
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const currentYearKey = `${today.getFullYear()}`;
+    const dateStr = today.toISOString().slice(0, 10);
+
+    const monthlyPdfIds = [
+      `notif-monthly-pdf-cc-${currentMonthKey}`,
+      `notif-monthly-pdf-lube-${currentMonthKey}`,
+      `notif-monthly-pdf-exp-${currentMonthKey}`,
+      `notif-monthly-pdf-fuel-${currentMonthKey}`,
+      `notif-monthly-pdf-emp-${currentMonthKey}`,
+      `notif-monthly-pdf-master-${currentMonthKey}`
+    ];
+
+    const yearlyPdfId = `notif-yearly-pdf-${currentYearKey}`;
+
+    setNotifications(prev => {
+      const existingIds = new Set(prev.map(n => n.id));
+      const newToInsert: AppNotification[] = [];
+
+      if (!existingIds.has(monthlyPdfIds[0])) {
+        newToInsert.push(
+          { id: monthlyPdfIds[0], title: '📄 Monthly Report Ready', message: 'Your Monthly Credit Card PDF is ready.', type: 'INFO', category: 'SYSTEM', date: dateStr, read: false },
+          { id: monthlyPdfIds[1], title: '📄 Monthly Report Ready', message: 'Your Monthly Lubricant PDF is ready.', type: 'INFO', category: 'SYSTEM', date: dateStr, read: false },
+          { id: monthlyPdfIds[2], title: '📄 Monthly Report Ready', message: 'Your Monthly Expense PDF is ready.', type: 'INFO', category: 'SYSTEM', date: dateStr, read: false },
+          { id: monthlyPdfIds[3], title: '📄 Monthly Report Ready', message: 'Your Monthly Fuel Report PDF is ready.', type: 'INFO', category: 'SYSTEM', date: dateStr, read: false },
+          { id: monthlyPdfIds[4], title: '📄 Monthly Report Ready', message: 'Your Monthly Employee Report PDF is ready.', type: 'INFO', category: 'SYSTEM', date: dateStr, read: false },
+          { id: monthlyPdfIds[5], title: '📄 Monthly Master Report Ready', message: 'Your Complete Monthly Business Report PDF is ready.', type: 'SUCCESS', category: 'SYSTEM', date: dateStr, read: false }
+        );
+      }
+
+      if (!existingIds.has(yearlyPdfId)) {
+        newToInsert.push({
+          id: yearlyPdfId,
+          title: '📊 Annual Business Report Ready',
+          message: 'Your Annual Business Reports are ready for PDF export.',
+          type: 'SUCCESS',
+          category: 'SYSTEM',
+          date: dateStr,
+          read: false
+        });
+      }
+
+      if (newToInsert.length === 0) {
+        return prev;
+      }
+
+      newToInsert.forEach(n => syncSaveDoc('notifications', n));
+      return [...newToInsert, ...prev];
+    });
+
+    notifsCheckedRef.current = true;
+  }, [notifications]);
 
   // Sync activeTab with currentView for navigation
   const handleSetActiveTab = (tab: string) => {

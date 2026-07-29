@@ -5,10 +5,11 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 import { PDFExportButton } from '../common/PDFExportButton';
+import { AdminDeleteButton } from '../common/AdminDeleteButton';
 import { Building2, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw, Wallet, X, ShieldCheck, Trash2 } from 'lucide-react';
 
 export const BankView: React.FC = () => {
-  const { bankAccounts, cashRegister, addBankAccount, addBankTransaction, deleteBankAccount, canDelete } = useApp();
+  const { bankAccounts, cashRegister, addBankAccount, addBankTransaction, deleteBankAccount, deleteBankTransaction, canDelete } = useApp();
 
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -194,7 +195,14 @@ export const BankView: React.FC = () => {
                         <span className="font-bold">{formatCurrency(tx.amount)}</span>
                         <span className="text-[11px] ml-2 font-medium">{tx.referenceNumber || tx.notes}</span>
                       </div>
-                      <span className="text-[10px] opacity-75">{formatDate(tx.date)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] opacity-75">{formatDate(tx.date)}</span>
+                        <AdminDeleteButton
+                          onDelete={() => deleteBankTransaction(tx.id)}
+                          variant="small-icon"
+                          itemName={`Transaction ${formatCurrency(tx.amount)}`}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

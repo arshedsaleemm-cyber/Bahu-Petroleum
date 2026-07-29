@@ -4,10 +4,11 @@ import { SalaryRecord, Worker } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
 import { PDFExportButton } from '../common/PDFExportButton';
+import { AdminDeleteButton } from '../common/AdminDeleteButton';
 import { Banknote, Plus, History, DollarSign, X, CheckCircle } from 'lucide-react';
 
 export const SalaryView: React.FC = () => {
-  const { workers, salaries, addSalaryAdvance, paySalary } = useApp();
+  const { workers, salaries, addSalaryAdvance, paySalary, deleteAdvanceRecord, deleteSalaryRecord } = useApp();
 
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
@@ -94,9 +95,18 @@ export const SalaryView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <p className="text-[10px] text-slate-400 uppercase font-bold">Monthly Base</p>
-                  <p className="text-sm font-black text-slate-900">{formatCurrency(monthlySal)}</p>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold">Monthly Base</p>
+                    <p className="text-sm font-black text-slate-900">{formatCurrency(monthlySal)}</p>
+                  </div>
+                  {sal && (
+                    <AdminDeleteButton
+                      onDelete={() => deleteSalaryRecord(sal.id)}
+                      itemName={`Salary Record for ${w.name}`}
+                      variant="icon"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -130,7 +140,14 @@ export const SalaryView: React.FC = () => {
                           <span className="font-bold">{formatCurrency(adv.amount)}</span>
                           <span className="text-[11px] text-amber-700 ml-2">({adv.notes || 'Advance'})</span>
                         </div>
-                        <span className="text-[10px] text-amber-600 font-medium">{formatDate(adv.date)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-amber-600 font-medium">{formatDate(adv.date)}</span>
+                          <AdminDeleteButton
+                            onDelete={() => deleteAdvanceRecord(sal.id, adv.id)}
+                            variant="small-icon"
+                            itemName={`Advance ${formatCurrency(adv.amount)}`}
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

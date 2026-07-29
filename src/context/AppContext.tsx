@@ -25,6 +25,7 @@ import {
   AttendanceRecord,
   SalaryRecord,
   UdhaarCustomer,
+  UdhaarTransaction,
   ExpenseCategory,
   Expense,
   BankAccount,
@@ -173,23 +174,32 @@ interface AppContextType {
   updateWorker: (worker: Worker) => void;
   deleteWorker: (id: string) => void;
   markAttendance: (workerId: string, status: AttendanceRecord['status'], date: string, notes?: string) => void;
+  deleteAttendance: (id: string) => void;
   addSalaryAdvance: (workerId: string, amount: number, notes?: string) => void;
+  deleteAdvanceRecord: (workerId: string, advanceId: string) => void;
   paySalary: (workerId: string, amount: number) => void;
+  deleteSalaryRecord: (id: string) => void;
   addUdhaarCustomer: (data: Omit<UdhaarCustomer, 'id' | 'remainingBalance' | 'transactions'>) => void;
+  updateUdhaarCustomer: (id: string, data: Partial<UdhaarCustomer>) => void;
+  deleteUdhaarCustomer: (id: string) => void;
   addUdhaarTransaction: (
     customerId: string,
     type: 'CREDIT_PURCHASE' | 'PAYMENT_RECEIVED',
     amount: number,
     description: string,
-    vehicleNumber?: string
+    vehicleNumber?: string,
+    date?: string,
+    time?: string
   ) => void;
+  editUdhaarTransaction: (customerId: string, transactionId: string, updatedTx: Partial<UdhaarTransaction>) => void;
+  deleteUdhaarTransaction: (customerId: string, transactionId: string) => void;
   addExpenseCategory: (name: string) => void;
   addExpense: (data: Omit<Expense, 'id' | 'createdBy'>) => void;
   deleteExpense: (id: string) => void;
   addBankAccount: (data: Omit<BankAccount, 'id'>) => void;
   deleteBankAccount: (id: string) => void;
   addBankTransaction: (data: Omit<BankTransaction, 'id' | 'createdBy'>) => void;
-  deleteUdhaarCustomer: (id: string) => void;
+  deleteBankTransaction: (id: string) => void;
   updateCashRegister: (data: Partial<CashRegister>) => void;
   addCreditCardSale: (data: Omit<CreditCardTransaction, 'id'>) => void;
   deleteCreditCardSale: (id: string) => void;
@@ -225,7 +235,11 @@ interface AppContextType {
   updateRestaurantInventory: (inv: RestaurantKitchenInventory) => void;
   deleteRestaurantInventory: (id: string) => void;
   addRestaurantPurchase: (data: Omit<RestaurantPurchase, 'id'>) => void;
+  deleteRestaurantPurchase: (id: string) => void;
   addRestaurantDeposit: (data: Omit<RestaurantDeposit, 'id'>) => void;
+  deleteRestaurantDeposit: (id: string) => void;
+  deleteRestaurantAttendance: (id: string) => void;
+  deleteRestaurantSalary: (id: string) => void;
 
   // Misc
   addUser: (data: Omit<User, 'id' | 'createdAt'>) => void;
@@ -890,6 +904,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const deleteAttendance = (id: string) => {
+    if (!canDelete) return;
+    setAttendance(prev => prev.filter(a => a.id !== id));
+    syncDeleteDoc('attendance', id);
+    logAuditDelete('Attendance Record', id);
+  };
+
+  const deleteSalaryRecord = (id: string) => {
+    if (!canDelete) return;
+    setSalaries(prev => prev.filter(s => s.id !== id));
+    syncDeleteDoc('salaries', id);
+    logAuditDelete('Salary Record', id);
+  };
+
+  const deleteAdvanceRecord = (workerId: string, advanceId: string) => {
+    if (!canDelete) return;
+    setSalaries(prev =>
+      prev.map(s => {
+        if (s.workerId === workerId) {
+          const targetAdv = s.advanceHistory.find(a => a.id === advanceId);
+          const advAmount = targetAdv ? targetAdv.amount : 0;
+          const newHistory = s.advanceHistory.filter(a => a.id !== advanceId);
+          const newTotalAdvance = Math.max(0, s.totalAdvance - advAmount);
+          const remaining = Math.max(0, s.monthlySalary - newTotalAdvance - s.salaryPaid);
+          const updated = {
+            ...s,
+            totalAdvance: newTotalAdvance,
+            advanceHistory: newHistory,
+            remainingSalary: remaining,
+            pendingSalary: remaining,
+          };
+          syncSaveDoc('salaries', updated);
+          return updated;
+        }
+        return s;
+      })
+    );
+    logAuditDelete('Employee Advance', advanceId);
+  };
+
   const addSalaryAdvance = (workerId: string, amount: number, notes?: string) => {
     setSalaries(prev =>
       prev.map(s => {
@@ -941,6 +995,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newCust: UdhaarCustomer = {
       ...data,
       id: `udh-${Date.now()}`,
+      totalCredit: data.totalCredit || 0,
+      paymentReceived: data.paymentReceived || 0,
       remainingBalance: (data.totalCredit || 0) - (data.paymentReceived || 0),
       transactions: [],
     };
@@ -948,27 +1004,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncSaveDoc('udhaarCustomers', newCust);
   };
 
+  const updateUdhaarCustomer = (id: string, data: Partial<UdhaarCustomer>) => {
+    setUdhaarCustomers(prev =>
+      prev.map(c => {
+        if (c.id === id) {
+          const updated = { ...c, ...data };
+          updated.remainingBalance = (updated.totalCredit || 0) - (updated.paymentReceived || 0);
+          syncSaveDoc('udhaarCustomers', updated);
+          return updated;
+        }
+        return c;
+      })
+    );
+  };
+
   const addUdhaarTransaction = (
     customerId: string,
     type: 'CREDIT_PURCHASE' | 'PAYMENT_RECEIVED',
     amount: number,
     description: string,
-    vehicleNumber?: string
+    vehicleNumber?: string,
+    date?: string,
+    time?: string
   ) => {
     setUdhaarCustomers(prev =>
       prev.map(c => {
         if (c.id === customerId) {
-          const newTx = {
+          const totalCredit = type === 'CREDIT_PURCHASE' ? c.totalCredit + amount : c.totalCredit;
+          const paymentReceived = type === 'PAYMENT_RECEIVED' ? c.paymentReceived + amount : c.paymentReceived;
+          const remaining = totalCredit - paymentReceived;
+          const newTx: UdhaarTransaction = {
             id: `ut-${Date.now()}`,
-            date: new Date().toISOString().slice(0, 10),
+            date: date || new Date().toISOString().slice(0, 10),
+            time: time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             type,
             amount,
             description,
             vehicleNumber,
+            runningBalance: remaining,
           };
-          const totalCredit = type === 'CREDIT_PURCHASE' ? c.totalCredit + amount : c.totalCredit;
-          const paymentReceived = type === 'PAYMENT_RECEIVED' ? c.paymentReceived + amount : c.paymentReceived;
-          const remaining = totalCredit - paymentReceived;
           const updated = {
             ...c,
             totalCredit,
@@ -982,6 +1056,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return c;
       })
     );
+  };
+
+  const editUdhaarTransaction = (customerId: string, txId: string, updatedTx: Partial<UdhaarTransaction>) => {
+    setUdhaarCustomers(prev =>
+      prev.map(c => {
+        if (c.id === customerId) {
+          const newTxs = c.transactions.map(t => (t.id === txId ? { ...t, ...updatedTx } : t));
+          let totalCredit = 0;
+          let paymentReceived = 0;
+          newTxs.forEach(t => {
+            if (t.type === 'CREDIT_PURCHASE') totalCredit += t.amount;
+            else if (t.type === 'PAYMENT_RECEIVED') paymentReceived += t.amount;
+          });
+          const remaining = totalCredit - paymentReceived;
+          const updated = {
+            ...c,
+            totalCredit,
+            paymentReceived,
+            remainingBalance: remaining,
+            transactions: newTxs,
+          };
+          syncSaveDoc('udhaarCustomers', updated);
+          return updated;
+        }
+        return c;
+      })
+    );
+  };
+
+  const deleteUdhaarTransaction = (customerId: string, txId: string) => {
+    if (!canDelete) return;
+    setUdhaarCustomers(prev =>
+      prev.map(c => {
+        if (c.id === customerId) {
+          const targetTx = c.transactions.find(t => t.id === txId);
+          if (!targetTx) return c;
+          const newTxs = c.transactions.filter(t => t.id !== txId);
+          const totalCredit = targetTx.type === 'CREDIT_PURCHASE' ? Math.max(0, c.totalCredit - targetTx.amount) : c.totalCredit;
+          const paymentReceived = targetTx.type === 'PAYMENT_RECEIVED' ? Math.max(0, c.paymentReceived - targetTx.amount) : c.paymentReceived;
+          const remaining = totalCredit - paymentReceived;
+          const updated = {
+            ...c,
+            totalCredit,
+            paymentReceived,
+            remainingBalance: remaining,
+            transactions: newTxs,
+          };
+          syncSaveDoc('udhaarCustomers', updated);
+          return updated;
+        }
+        return c;
+      })
+    );
+    logAuditDelete('Credit Transaction', txId);
   };
 
   // Expenses
@@ -1045,6 +1173,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return b;
       })
     );
+  };
+
+  const deleteBankTransaction = (id: string) => {
+    if (!canDelete) return;
+    const tx = bankTransactions.find(b => b.id === id);
+    setBankTransactions(prev => prev.filter(b => b.id !== id));
+    syncDeleteDoc('bankTransactions', id);
+    if (tx) {
+      setBankAccounts(prev =>
+        prev.map(b => {
+          if (b.id === tx.bankId) {
+            const change = tx.type === 'Deposit' ? -tx.amount : tx.amount;
+            const updated = { ...b, currentBalance: b.currentBalance + change };
+            syncSaveDoc('bankAccounts', updated);
+            return updated;
+          }
+          return b;
+        })
+      );
+    }
+    logAuditDelete('Bank Transaction', id);
   };
 
   const updateCashRegister = (data: Partial<CashRegister>) => {
@@ -1319,10 +1468,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncSaveDoc('restaurantPurchases', newPur);
   };
 
+  const deleteRestaurantPurchase = (id: string) => {
+    if (!canDelete) return;
+    setRestaurantPurchases(prev => prev.filter(p => p.id !== id));
+    syncDeleteDoc('restaurantPurchases', id);
+  };
+
   const addRestaurantDeposit = (data: Omit<RestaurantDeposit, 'id'>) => {
     const newDep: RestaurantDeposit = { ...data, id: `rdep-${Date.now()}` };
     setRestaurantDeposits(prev => [newDep, ...prev]);
     syncSaveDoc('restaurantDeposits', newDep);
+  };
+
+  const deleteRestaurantDeposit = (id: string) => {
+    if (!canDelete) return;
+    setRestaurantDeposits(prev => prev.filter(d => d.id !== id));
+    syncDeleteDoc('restaurantDeposits', id);
+  };
+
+  const deleteRestaurantAttendance = (id: string) => {
+    if (!canDelete) return;
+    setRestaurantAttendance(prev => prev.filter(a => a.id !== id));
+    syncDeleteDoc('restaurantAttendance', id);
+  };
+
+  const deleteRestaurantSalary = (id: string) => {
+    if (!canDelete) return;
+    setRestaurantSalaries(prev => prev.filter(s => s.id !== id));
+    syncDeleteDoc('restaurantSalaries', id);
   };
 
   // Daily Sales Entry Actions
@@ -1613,16 +1786,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateWorker,
         deleteWorker,
         markAttendance,
+        deleteAttendance,
         addSalaryAdvance,
+        deleteAdvanceRecord,
         paySalary,
+        deleteSalaryRecord,
         addUdhaarCustomer,
+        updateUdhaarCustomer,
         addUdhaarTransaction,
+        editUdhaarTransaction,
+        deleteUdhaarTransaction,
         addExpenseCategory,
         addExpense,
         deleteExpense,
         addBankAccount,
         deleteBankAccount,
         addBankTransaction,
+        deleteBankTransaction,
         deleteUdhaarCustomer,
         updateCashRegister,
         addCreditCardSale,
@@ -1655,7 +1835,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateRestaurantInventory,
         deleteRestaurantInventory,
         addRestaurantPurchase,
+        deleteRestaurantPurchase,
         addRestaurantDeposit,
+        deleteRestaurantDeposit,
+        deleteRestaurantAttendance,
+        deleteRestaurantSalary,
         addUser,
         updateUserStatus,
         markNotificationRead,

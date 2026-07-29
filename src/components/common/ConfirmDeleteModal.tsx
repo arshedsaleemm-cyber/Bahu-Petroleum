@@ -11,8 +11,8 @@ interface ConfirmDeleteModalProps {
 
 export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   isOpen,
-  title = "Confirm Permanent Deletion",
-  message = "Are you sure you want to permanently delete this item? This action cannot be undone.",
+  title = "Confirm Delete",
+  message = "Are you sure you want to permanently delete this record?",
   onConfirm,
   onCancel,
 }) => {

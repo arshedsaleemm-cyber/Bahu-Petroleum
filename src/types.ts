@@ -124,11 +124,13 @@ export interface SalaryRecord {
 export interface UdhaarTransaction {
   id: string;
   date: string;
+  time?: string;
   type: 'CREDIT_PURCHASE' | 'PAYMENT_RECEIVED';
   amount: number;
   description: string;
   vehicleNumber?: string;
   receiptNumber?: string;
+  runningBalance?: number;
 }
 
 export interface UdhaarCustomer {

@@ -31,6 +31,7 @@ export type ModuleReportKey =
   | 'TUCK_SHOP'
   | 'RESTAURANT'
   | 'PROFIT_LOSS'
+  | 'CREDIT_CUSTOMERS'
   | 'COMPLETE_BUSINESS';
 
 export const exportModulePDF = (
@@ -744,7 +745,67 @@ export const exportModulePDF = (
       break;
     }
 
+    case 'CREDIT_CUSTOMERS': {
+      const customers = appState.udhaarCustomers || [];
+      const totalCredit = customers.reduce((sum: number, c: any) => sum + (c.totalCredit || 0), 0);
+      const totalReceived = customers.reduce((sum: number, c: any) => sum + (c.paymentReceived || 0), 0);
+      const totalOutstanding = customers.reduce((sum: number, c: any) => sum + (c.remainingBalance || 0), 0);
+
+      const sections: PDFSection[] = [
+        {
+          title: 'Credit Customers (Udhaar Register) Ledger Statement',
+          summaryCards: [
+            { label: 'Total Credit Accounts', value: `${customers.length}` },
+            { label: 'Total Credit Extended', value: formatCurrency(totalCredit) },
+            { label: 'Total Payments Received', value: formatCurrency(totalReceived) },
+            { label: 'Total Outstanding Balance', value: formatCurrency(totalOutstanding) },
+          ],
+          headers: ['Customer Name', 'Phone Number', 'Vehicle / Details', 'Credit Limit', 'Total Credit', 'Received', 'Outstanding Balance'],
+          rows: customers.map((c: any) => [
+            c.customerName || c.name,
+            c.phoneNumber || '-',
+            c.vehicleNumber || '-',
+            formatCurrency(c.creditLimit || 0),
+            formatCurrency(c.totalCredit || 0),
+            formatCurrency(c.paymentReceived || 0),
+            formatCurrency(c.remainingBalance || 0),
+          ]),
+        },
+      ];
+      generateProfessionalPDF('Credit Customers Udhaar Report', label, sections, 'Credit_Customers_Report');
+      break;
+    }
+
     default:
       break;
   }
+};
+
+export const exportCustomerLedgerPDF = (customer: any) => {
+  const sections: PDFSection[] = [
+    {
+      title: `Credit Account Statement - ${customer.customerName || customer.name}`,
+      summaryCards: [
+        { label: 'Customer Name', value: customer.customerName || customer.name },
+        { label: 'Mobile / Phone', value: customer.phoneNumber || 'N/A' },
+        { label: 'Credit Limit', value: formatCurrency(customer.creditLimit || 0) },
+        { label: 'Outstanding Balance', value: formatCurrency(customer.remainingBalance || 0) },
+      ],
+      headers: ['Date', 'Time', 'Description', 'Credit Added', 'Payment Received', 'Running Balance'],
+      rows: (customer.transactions || []).map((t: any) => [
+        t.date,
+        t.time || '12:00 PM',
+        t.description || (t.type === 'CREDIT_PURCHASE' ? 'Credit Purchase' : 'Payment Received'),
+        t.type === 'CREDIT_PURCHASE' ? formatCurrency(t.amount) : '-',
+        t.type === 'PAYMENT_RECEIVED' ? formatCurrency(t.amount) : '-',
+        formatCurrency(t.runningBalance !== undefined ? t.runningBalance : t.amount),
+      ]),
+    },
+  ];
+  generateProfessionalPDF(
+    `Udhaar Ledger Statement - ${customer.customerName || customer.name}`,
+    `Generated on ${new Date().toLocaleDateString()}`,
+    sections,
+    `Udhaar_Ledger_${(customer.customerName || customer.name).replace(/[^a-zA-Z0-9]/g, '_')}`
+  );
 };

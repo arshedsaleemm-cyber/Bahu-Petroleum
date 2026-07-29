@@ -4,10 +4,11 @@ import { AttendanceStatus } from '../../types';
 import { formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
 import { PDFExportButton } from '../common/PDFExportButton';
+import { AdminDeleteButton } from '../common/AdminDeleteButton';
 import { CalendarCheck, Check, X, Clock, AlertCircle, Calendar } from 'lucide-react';
 
 export const AttendanceView: React.FC = () => {
-  const { workers, attendance, markAttendance } = useApp();
+  const { workers, attendance, markAttendance, deleteAttendance } = useApp();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
 
   const activeWorkers = workers.filter(w => w.status === 'Active');
@@ -89,7 +90,8 @@ export const AttendanceView: React.FC = () => {
 
         <div className="divide-y divide-slate-100">
           {activeWorkers.map(w => {
-            const currentStatus = getWorkerStatusForDate(w.id);
+            const attRecord = attendance.find(a => a.workerId === w.id && a.date === selectedDate);
+            const currentStatus = attRecord ? attRecord.status : 'Present';
             return (
               <div key={w.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50">
                 <div className="flex items-center gap-3">
@@ -107,29 +109,39 @@ export const AttendanceView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 self-start sm:self-auto">
-                  {(['Present', 'Absent', 'Leave', 'Half Day'] as AttendanceStatus[]).map(st => {
-                    const isSelected = currentStatus === st;
-                    return (
-                      <button
-                        key={st}
-                        onClick={() => handleStatusChange(w.id, st)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          isSelected
-                            ? st === 'Present'
-                              ? 'bg-emerald-600 text-white shadow-sm'
-                              : st === 'Absent'
-                              ? 'bg-rose-600 text-white shadow-sm'
-                              : st === 'Leave'
-                              ? 'bg-amber-600 text-white shadow-sm'
-                              : 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {st}
-                      </button>
-                    );
-                  })}
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <div className="flex items-center gap-1.5">
+                    {(['Present', 'Absent', 'Leave', 'Half Day'] as AttendanceStatus[]).map(st => {
+                      const isSelected = currentStatus === st;
+                      return (
+                        <button
+                          key={st}
+                          onClick={() => handleStatusChange(w.id, st)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            isSelected
+                              ? st === 'Present'
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : st === 'Absent'
+                                ? 'bg-rose-600 text-white shadow-sm'
+                                : st === 'Leave'
+                                ? 'bg-amber-600 text-white shadow-sm'
+                                : 'bg-blue-600 text-white shadow-sm'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {st}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {attRecord && (
+                    <AdminDeleteButton
+                      onDelete={() => deleteAttendance(attRecord.id)}
+                      itemName={`Attendance for ${w.name} (${formatDate(selectedDate)})`}
+                      variant="icon"
+                    />
+                  )}
                 </div>
               </div>
             );

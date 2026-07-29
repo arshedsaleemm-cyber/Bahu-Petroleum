@@ -9,12 +9,8 @@ import {
   Copy,
   Check,
   ShieldAlert,
-  HelpCircle,
-  Fuel,
-  Users,
-  Receipt,
-  DollarSign,
-  ChevronRight,
+  Mic,
+  MicOff,
   RefreshCw,
 } from 'lucide-react';
 
@@ -31,22 +27,32 @@ export const BahuAIAssistantView: React.FC = () => {
     isAdmin,
     dailySalesEntries,
     tanks,
+    updateTank,
     deliveries,
     lubricants,
     workers,
-    attendance,
     salaries,
+    markAttendance,
+    addSalaryAdvance,
+    paySalary,
     creditCardSales,
+    addCreditCardSale,
     infiniCardSales,
+    addInfiniCardSale,
     cashRegister,
     bankAccounts,
+    addBankTransaction,
     expenses,
-    shops,
+    addExpense,
     rentalAgreements,
     tyreShopServices,
+    addTyreShopService,
     carWashServices,
+    addCarWashService,
     tuckShopItems,
+    addTuckShopItem,
     restaurantSales,
+    addRestaurantSale,
     udhaarCustomers,
   } = useApp();
 
@@ -55,26 +61,19 @@ export const BahuAIAssistantView: React.FC = () => {
     {
       id: 'welcome-1',
       sender: 'assistant',
-      text: `Hello **${currentUser?.name || 'Admin'}**! I am **Bahu AI Assistant**, your intelligent business manager and financial analyst for **Bahu Petroleum**.
+      text: `Hello **${currentUser?.name || 'Admin'}**! I am **Bahu AI Assistant**, your business manager and financial analyst for **Bahu Petroleum**.
 
-I have full access to your live database across all 16 modules. Ask me anything about:
-- ⛽ **Fuel Sales & Tank Stock**
-- 🚚 **Delivery Shortages & Tanker History**
-- 🛢️ **Lubricants & Sub-Business Revenue**
-- 👥 **Workers, Pending Salaries & Advances**
-- 💳 **Credit Card & Infini Card Collections**
-- 🏦 **Cash vs Bank Balances**
-- 🧾 **Categorized Expenses (Water, Electricity, Maintenance, etc.)**
-- 📊 **Net Profit & Business Performance**
-
-Select a quick question below or type your custom query!`,
+How can I assist you today?`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -84,93 +83,277 @@ Select a quick question below or type your custom query!`,
     scrollToBottom();
   }, [messages, isLoading]);
 
-  // Prepared Prompt Suggestions by Category
-  const promptSuggestions = [
-    {
-      category: 'Fuel & Stock',
-      icon: Fuel,
-      color: 'bg-amber-500/10 text-amber-600 border-amber-200',
-      questions: [
-        'How much fuel was sold today?',
-        'Show current tank stock and low fuel alerts.',
-        'Was there any shortage in fuel delivery this month?',
-        'Compare this month fuel sale with last month.',
-      ],
-    },
-    {
-      category: 'Finance & Profit',
-      icon: DollarSign,
-      color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
-      questions: [
-        'What is my net profit this month?',
-        'How much cash vs bank balance is available?',
-        'How much money came through Credit Card & Infinity Card?',
-        'Show complete business financial summary.',
-      ],
-    },
-    {
-      category: 'Workers & HR',
-      icon: Users,
-      color: 'bg-blue-500/10 text-blue-600 border-blue-200',
-      questions: [
-        'Who has the highest pending worker salary or advance?',
-        'How much total salary expense happened this month?',
-        'Show attendance summary & absent workers.',
-        'How many employees are working and who took maximum advance?',
-      ],
-    },
-    {
-      category: 'Expenses & Sub-Biz',
-      icon: Receipt,
-      color: 'bg-purple-500/10 text-purple-600 border-purple-200',
-      questions: [
-        'How much water, electricity and maintenance expense happened this month?',
-        'Show category wise expense breakdown.',
-        'How much revenue came from Tyre Shop, Car Wash, Tuck Shop & Restaurant?',
-        'What is total lubricant sale this month?',
-      ],
-    },
-  ];
+  // Voice speech recognition setup
+  const toggleVoiceInput = () => {
+    setVoiceError(null);
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-  // Helper to compile total live database context snapshot
+    if (!SpeechRecognition) {
+      setVoiceError('Speech recognition is not supported in this browser. Please type your command.');
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (_) {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'ur-PK'; // Supports Urdu & English
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setVoiceError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0])
+          .map((result: any) => result.transcript)
+          .join('');
+        setInputQuery(transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          setVoiceError('Microphone access is blocked by your browser or iframe permissions. Please grant permission or type your request below.');
+        } else if (event.error === 'no-speech') {
+          setVoiceError('No speech was detected. Please try speaking again or type your command.');
+        } else if (event.error === 'aborted') {
+          // Silent abort
+        } else {
+          setVoiceError(`Voice input error (${event.error}). Please type your command.`);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.warn('Voice input start error:', err);
+      setIsListening(false);
+      setVoiceError('Could not start microphone. Please check browser permissions or type your command.');
+    }
+  };
+
+  // Execute database action returned from AI
+  const executeDatabaseAction = (action: any) => {
+    if (!action || !action.type) return;
+
+    const p = action.payload || {};
+    const amount = Number(p.amount) || 0;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    try {
+      switch (action.type) {
+        case 'ADD_EXPENSE': {
+          addExpense({
+            title: `${p.category || 'Expense'} Entry`,
+            category: p.category || 'Other',
+            amount: amount,
+            date: dateStr,
+            time: timeStr,
+            description: p.notes || 'Added via Bahu AI Assistant',
+            notes: p.notes || 'Added via Bahu AI Assistant',
+          });
+          break;
+        }
+
+        case 'ADD_TYRE_SHOP_SALE': {
+          addTyreShopService({
+            serviceType: 'New Tyre Sales',
+            customerName: p.customerName || 'Walk-in AI Sale',
+            vehicleNumber: 'N/A',
+            vehicleType: 'Car',
+            serviceCost: amount,
+            paymentMethod: 'Cash',
+            technicianName: 'General Technician',
+            dateTime: `${dateStr} ${timeStr}`,
+          });
+          break;
+        }
+
+        case 'ADD_CAR_WASH_SALE': {
+          addCarWashService({
+            vehicleCategory: 'Car',
+            washPackage: 'Normal Wash',
+            customerName: p.customerName || 'Walk-in AI Sale',
+            vehicleNumber: 'N/A',
+            serviceFee: amount,
+            paymentStatus: 'Paid',
+            washerWorker: 'General Washer',
+            dateTime: `${dateStr} ${timeStr}`,
+          });
+          break;
+        }
+
+        case 'ADD_RESTAURANT_SALE': {
+          addRestaurantSale({
+            date: dateStr,
+            time: timeStr,
+            customerName: p.customerName || 'Walk-in Customer',
+            orderType: 'Takeaway',
+            paymentMethod: 'Cash',
+            totalAmount: amount,
+            netAmount: amount,
+          });
+          break;
+        }
+
+        case 'ADD_TUCK_SHOP_SALE': {
+          addTuckShopItem({
+            itemName: p.itemName || 'Quick AI Sale Item',
+            category: 'Snacks',
+            barcode: 'AI-' + Date.now().toString().slice(-6),
+            stockQty: 10,
+            purchasePrice: Math.round(amount * 0.8),
+            salePrice: amount,
+            reorderLevel: 2,
+          });
+          break;
+        }
+
+        case 'ADD_CREDIT_CARD_SALE': {
+          addCreditCardSale({
+            date: dateStr,
+            time: timeStr,
+            terminalId: 'POS-01',
+            customerName: p.customerName || 'Walk-in',
+            amount: amount,
+            receiptNo: 'SLIP-' + Date.now().toString().slice(-4),
+          });
+          break;
+        }
+
+        case 'ADD_INFINI_CARD_SALE': {
+          addInfiniCardSale({
+            date: dateStr,
+            time: timeStr,
+            cardNumber: 'INF-' + Date.now().toString().slice(-4),
+            fleetName: p.customerName || 'Corporate Fleet',
+            vehicleNumber: 'N/A',
+            amount: amount,
+            liters: Math.round(amount / 280),
+            fuelType: 'Petrol',
+            receiptNo: 'INF-' + Date.now().toString().slice(-4),
+          });
+          break;
+        }
+
+        case 'UPDATE_TANK_FUEL': {
+          const targetTank =
+            tanks.find((t) => t.tankName.toLowerCase().includes(p.tankName?.toLowerCase() || '')) || tanks[0];
+          if (targetTank) {
+            const change = Number(p.changeLiters) || 0;
+            const updatedFuel = Math.max(0, Math.min(targetTank.capacity, targetTank.currentFuel + change));
+            updateTank({ ...targetTank, currentFuel: updatedFuel });
+          }
+          break;
+        }
+
+        case 'MARK_ATTENDANCE': {
+          const targetWorker = workers.find((w) =>
+            w.name.toLowerCase().includes(p.workerName?.toLowerCase() || '')
+          );
+          if (targetWorker) {
+            markAttendance(targetWorker.id, (p.status || 'Present') as any, dateStr);
+          }
+          break;
+        }
+
+        case 'ADD_SALARY_ADVANCE': {
+          const targetWorker = workers.find((w) =>
+            w.name.toLowerCase().includes(p.workerName?.toLowerCase() || '')
+          );
+          if (targetWorker) {
+            addSalaryAdvance(targetWorker.id, amount, p.notes || 'Added via Bahu AI');
+          }
+          break;
+        }
+
+        case 'PAY_SALARY': {
+          const targetWorker = workers.find((w) =>
+            w.name.toLowerCase().includes(p.workerName?.toLowerCase() || '')
+          );
+          if (targetWorker) {
+            paySalary(targetWorker.id, amount);
+          }
+          break;
+        }
+
+        case 'ADD_BANK_TRANSACTION': {
+          const targetBank =
+            bankAccounts.find((b) => b.bankName.toLowerCase().includes(p.bankName?.toLowerCase() || '')) ||
+            bankAccounts[0];
+          if (targetBank) {
+            addBankTransaction({
+              bankId: targetBank.id,
+              bankName: targetBank.bankName,
+              type: (p.type || 'Deposit') as any,
+              amount: amount,
+              referenceNumber: `AI-REF-${Date.now().toString().slice(-4)}`,
+              date: dateStr,
+            });
+          }
+          break;
+        }
+
+        default:
+          break;
+      }
+    } catch (err) {
+      console.error('Failed to execute AI database action:', err);
+    }
+  };
+
+  // Helper to compile live database snapshot
   const prepareDatabaseSnapshot = () => {
-    // Total income calculations
     const fuelRevenue = (dailySalesEntries || []).reduce((acc, curr) => acc + (curr.totalSales || 0), 0);
-    const lubricantRevenue = (lubricants || []).reduce((acc, curr) => acc + ((curr.stockIn - curr.remainingStock) * curr.sellingPrice), 0);
+    const lubricantRevenue = (lubricants || []).reduce(
+      (acc, curr) => acc + (curr.stockIn - curr.remainingStock) * curr.sellingPrice,
+      0
+    );
     const carWashRevenue = (carWashServices || []).reduce((acc, curr) => acc + curr.serviceFee, 0);
     const tyreShopRevenue = (tyreShopServices || []).reduce((acc, curr) => acc + curr.serviceCost, 0);
-    const tuckShopRevenue = (tuckShopItems || []).reduce((acc, curr) => acc + (curr.stockQty * curr.salePrice), 0);
+    const tuckShopRevenue = (tuckShopItems || []).reduce((acc, curr) => acc + curr.stockQty * curr.salePrice, 0);
     const restaurantRevenue = (restaurantSales || []).reduce((acc, curr) => acc + curr.netAmount, 0);
     const rentalRevenue = (rentalAgreements || []).reduce((acc, curr) => acc + curr.amountPaid, 0);
 
-    const totalIncome = fuelRevenue + lubricantRevenue + carWashRevenue + tyreShopRevenue + tuckShopRevenue + restaurantRevenue + rentalRevenue;
+    const totalIncome =
+      fuelRevenue +
+      lubricantRevenue +
+      carWashRevenue +
+      tyreShopRevenue +
+      tuckShopRevenue +
+      restaurantRevenue +
+      rentalRevenue;
 
-    // Total expenses
     const regularExpenses = (expenses || []).reduce((acc, curr) => acc + curr.amount, 0);
     const salaryExpensesPaid = (salaries || []).reduce((acc, curr) => acc + curr.salaryPaid, 0);
     const totalExpenses = regularExpenses + salaryExpensesPaid;
 
-    // Expense categories
     const expenseCategories: Record<string, number> = {};
-    (expenses || []).forEach(e => {
+    (expenses || []).forEach((e) => {
       const cat = e.category || 'Other';
       expenseCategories[cat] = (expenseCategories[cat] || 0) + e.amount;
     });
 
-    // Bank & Cash balance
     const totalBankBalance = (bankAccounts || []).reduce((acc, curr) => acc + curr.currentBalance, 0);
     const cashInRegister = cashRegister?.cashBalance || 0;
-
-    // Tank stock sum
-    const totalTankCapacity = (tanks || []).reduce((acc, curr) => acc + curr.capacity, 0);
-    const totalTankCurrent = (tanks || []).reduce((acc, curr) => acc + curr.currentFuel, 0);
-
-    // Delivery shortage
-    const totalShortageLiters = (deliveries || []).reduce((acc, curr) => acc + (curr.shortageLiters || 0), 0);
-
-    // Worker balances
-    const pendingSalariesTotal = (salaries || []).reduce((acc, curr) => acc + curr.pendingSalary, 0);
-    const advancesTotal = (salaries || []).reduce((acc, curr) => acc + curr.totalAdvance, 0);
 
     return {
       summary: {
@@ -179,18 +362,23 @@ Select a quick question below or type your custom query!`,
         netProfit: totalIncome - totalExpenses,
         cashInRegister,
         totalBankBalance,
-        totalTankCapacity,
-        totalTankCurrent,
-        totalShortageLiters,
-        pendingSalariesTotal,
-        advancesTotal,
       },
-      tanks: (tanks || []).map(t => ({ tankName: t.tankName, fuelType: t.fuelType, capacity: t.capacity, currentFuel: t.currentFuel, lowAlert: t.lowStockThreshold })),
+      tanks: (tanks || []).map((t) => ({
+        tankName: t.tankName,
+        fuelType: t.fuelType,
+        capacity: t.capacity,
+        currentFuel: t.currentFuel,
+      })),
       deliveries: (deliveries || []).slice(-10),
       dailySalesEntries: (dailySalesEntries || []).slice(-15),
-      lubricants: (lubricants || []).map(l => ({ productName: l.productName, category: l.category, remainingStock: l.remainingStock, salePrice: l.sellingPrice })),
-      workers: (workers || []).map(w => {
-        const sal = (salaries || []).find(s => s.workerId === w.id);
+      lubricants: (lubricants || []).map((l) => ({
+        productName: l.productName,
+        category: l.category,
+        remainingStock: l.remainingStock,
+        salePrice: l.sellingPrice,
+      })),
+      workers: (workers || []).map((w) => {
+        const sal = (salaries || []).find((s) => s.workerId === w.id);
         return {
           name: w.name,
           designation: w.designation,
@@ -203,7 +391,11 @@ Select a quick question below or type your custom query!`,
       expenseCategoryTotals: expenseCategories,
       creditCardSales: (creditCardSales || []).slice(-10),
       infiniCardSales: (infiniCardSales || []).slice(-10),
-      bankAccounts: (bankAccounts || []).map(b => ({ bankName: b.bankName, accountNumber: b.accountNumber, balance: b.currentBalance })),
+      bankAccounts: (bankAccounts || []).map((b) => ({
+        bankName: b.bankName,
+        accountNumber: b.accountNumber,
+        balance: b.currentBalance,
+      })),
       subBusinesses: {
         carWashTotal: carWashRevenue,
         tyreShopTotal: tyreShopRevenue,
@@ -215,12 +407,12 @@ Select a quick question below or type your custom query!`,
     };
   };
 
-  const handleSendQuery = async (queryText?: string) => {
-    const promptToSend = (queryText || inputQuery).trim();
+  const handleSendQuery = async () => {
+    const promptToSend = inputQuery.trim();
     if (!promptToSend || isLoading) return;
 
     if (!isAdmin) {
-      alert("Security Notice: Only Admin can access Bahu AI Assistant.");
+      alert('Security Notice: Only Admin can access Bahu AI Assistant.');
       return;
     }
 
@@ -231,7 +423,7 @@ Select a quick question below or type your custom query!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg]);
     setInputQuery('');
     setIsLoading(true);
 
@@ -243,7 +435,7 @@ Select a quick question below or type your custom query!`,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptToSend,
-          history: messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', text: m.text })),
+          history: messages.map((m) => ({ role: m.sender === 'user' ? 'user' : 'model', text: m.text })),
           dataContext: dataSnapshot,
           currentUserRole: currentUser?.role || 'ADMIN',
         }),
@@ -255,22 +447,27 @@ Select a quick question below or type your custom query!`,
         throw new Error(resData.error || 'Failed to get AI response.');
       }
 
+      // Execute DB action if present
+      if (resData.action) {
+        executeDatabaseAction(resData.action);
+      }
+
       const assistantMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'assistant',
-        text: resData.text,
+        text: resData.text || 'Done.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
-      setMessages(prev => [...prev, assistantMsg]);
+      setMessages((prev) => [...prev, assistantMsg]);
     } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         sender: 'assistant',
-        text: `⚠️ **AI Service Error**: ${err.message || 'Could not communicate with Bahu AI server.'}\n\nPlease verify that your Gemini API Key is configured in Settings > Secrets.`,
+        text: `⚠️ Error: ${err.message || 'Could not communicate with AI server.'}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages(prev => [...prev, errorMsg]);
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -295,200 +492,173 @@ Select a quick question below or type your custom query!`,
   }
 
   return (
-    <div className="space-y-4 max-w-6xl mx-auto pb-6">
-      {/* Top Header Card */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-2xl p-4 sm:p-6 text-white shadow-xl border border-blue-900/50 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center text-white shadow-lg shrink-0 border border-red-400/40">
-              <Bot className="w-7 h-7" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-                  Bahu AI Assistant
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-emerald-400" /> Live DB Connected
-                </span>
-              </div>
-              <p className="text-xs text-blue-200/90 font-medium mt-1">
-                Executive Financial Analyst & Operations Manager for Founder & CEO Mian Rashid Saleem
-              </p>
-            </div>
+    <div className="max-w-4xl mx-auto space-y-4 pb-6">
+      {/* Top Header */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-lg border border-blue-900/50 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center text-white shadow-md border border-red-400/30">
+            <Bot className="w-6 h-6" />
           </div>
-
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button
-              onClick={() => {
-                if (confirm('Clear chat history?')) {
-                  setMessages([messages[0]]);
-                }
-              }}
-              className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700"
-              title="Clear Conversation"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-slate-400" /> Reset Chat
-            </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-black text-white">Bahu AI Assistant</h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <Sparkles className="w-2.5 h-2.5 text-emerald-400" /> Live DB
+              </span>
+            </div>
           </div>
         </div>
+
+        <button
+          onClick={() => {
+            if (confirm('Clear chat history?')) {
+              setMessages([messages[0]]);
+            }
+          }}
+          className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-700 cursor-pointer"
+          title="Reset Chat"
+        >
+          <Trash2 className="w-3.5 h-3.5 text-slate-400" /> Reset
+        </button>
       </div>
 
-      {/* Main Chat & Suggestions Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Left Sidebar: Quick Prompts */}
-        <div className="lg:col-span-1 space-y-3">
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-              <HelpCircle className="w-4 h-4 text-blue-600" />
-              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                Quick Intelligence
-              </h3>
-            </div>
-
-            <div className="space-y-3 custom-scrollbar max-h-[600px] overflow-y-auto pr-1">
-              {promptSuggestions.map((section, idx) => {
-                const Icon = section.icon;
-                return (
-                  <div key={idx} className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                      <div className={`p-1 rounded-md border ${section.color}`}>
-                        <Icon className="w-3.5 h-3.5" />
-                      </div>
-                      <span>{section.category}</span>
-                    </div>
-
-                    <div className="space-y-1 pl-1">
-                      {section.questions.map((q, qIdx) => (
-                        <button
-                          key={qIdx}
-                          onClick={() => handleSendQuery(q)}
-                          disabled={isLoading}
-                          className="w-full text-left p-2 rounded-xl bg-slate-50 hover:bg-blue-50 hover:border-blue-200 border border-slate-100 text-[11px] font-medium text-slate-700 hover:text-blue-900 transition-all group flex items-start gap-1.5 cursor-pointer"
-                        >
-                          <ChevronRight className="w-3 h-3 text-slate-400 group-hover:text-blue-600 shrink-0 mt-0.5" />
-                          <span>{q}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Area: Chat Window */}
-        <div className="lg:col-span-3 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[600px] h-[650px] overflow-hidden">
-          {/* Chat Messages List */}
-          <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-4 bg-slate-50/50">
-            {messages.map((msg) => {
-              const isUser = msg.sender === 'user';
-              return (
+      {/* Clean Chat Window */}
+      <div className="flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm h-[620px] overflow-hidden">
+        {/* Messages Container */}
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-4 bg-slate-50/50">
+          {messages.map((msg) => {
+            const isUser = msg.sender === 'user';
+            return (
+              <div
+                key={msg.id}
+                className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+              >
                 <div
-                  key={msg.id}
-                  className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-xs shadow-sm ${
+                    isUser ? 'bg-blue-600' : 'bg-gradient-to-br from-red-600 to-red-700'
+                  }`}
                 >
+                  {isUser ? 'ME' : <Bot className="w-4 h-4" />}
+                </div>
+
+                <div className="space-y-1 max-w-[85%] sm:max-w-[75%]">
                   <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-xs shadow-sm ${
-                      isUser ? 'bg-blue-600' : 'bg-gradient-to-br from-red-600 to-red-700'
+                    className={`flex items-center gap-2 text-[10px] text-slate-400 font-semibold ${
+                      isUser ? 'justify-end' : 'justify-start'
                     }`}
                   >
-                    {isUser ? 'ME' : <Bot className="w-4 h-4" />}
+                    <span>{isUser ? 'Admin' : 'Bahu AI'}</span>
+                    <span>•</span>
+                    <span>{msg.timestamp}</span>
                   </div>
 
-                  <div className={`space-y-1 max-w-[85%] sm:max-w-[80%]`}>
-                    <div className={`flex items-center gap-2 text-[10px] text-slate-400 font-semibold ${isUser ? 'justify-end' : 'justify-start'}`}>
-                      <span>{isUser ? 'Admin' : 'Bahu AI Assistant'}</span>
-                      <span>•</span>
-                      <span>{msg.timestamp}</span>
-                    </div>
+                  <div
+                    className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm relative group ${
+                      isUser
+                        ? 'bg-blue-600 text-white rounded-tr-none font-medium'
+                        : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none font-semibold'
+                    }`}
+                  >
+                    {isUser ? (
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                    ) : (
+                      <div className="prose prose-xs max-w-none text-slate-800 font-sans leading-relaxed">
+                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      </div>
+                    )}
 
-                    <div
-                      className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm relative group ${
-                        isUser
-                          ? 'bg-blue-600 text-white rounded-tr-none'
-                          : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
-                      }`}
-                    >
-                      {isUser ? (
-                        <p className="whitespace-pre-wrap font-medium">{msg.text}</p>
-                      ) : (
-                        <div className="prose prose-xs sm:prose-sm max-w-none text-slate-800 font-sans leading-relaxed">
-                          <ReactMarkdown>{msg.text}</ReactMarkdown>
-                        </div>
-                      )}
-
-                      {!isUser && (
-                        <button
-                          onClick={() => handleCopyMessage(msg.text, msg.id)}
-                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
-                          title="Copy Answer"
-                        >
-                          {copiedId === msg.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5 text-slate-500" />
-                          )}
-                        </button>
-                      )}
-                    </div>
+                    {!isUser && (
+                      <button
+                        onClick={() => handleCopyMessage(msg.text, msg.id)}
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
+                        title="Copy"
+                      >
+                        {copiedId === msg.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                        )}
+                      </button>
+                    )}
                   </div>
-                </div>
-              );
-            })}
-
-            {isLoading && (
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-600 to-red-700 text-white flex items-center justify-center shrink-0">
-                  <Bot className="w-4 h-4" />
-                </div>
-                <div className="p-4 rounded-2xl rounded-tl-none bg-white border border-slate-200 text-slate-600 text-xs flex items-center gap-2 shadow-sm">
-                  <RefreshCw className="w-4 h-4 text-red-600 animate-spin" />
-                  <span className="font-semibold text-slate-700">
-                    Analyzing live database records & calculating insights...
-                  </span>
                 </div>
               </div>
-            )}
+            );
+          })}
 
-            <div ref={chatEndRef} />
-          </div>
+          {isLoading && (
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-600 to-red-700 text-white flex items-center justify-center shrink-0">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div className="p-3.5 rounded-2xl rounded-tl-none bg-white border border-slate-200 text-slate-600 text-xs flex items-center gap-2 shadow-sm font-semibold">
+                <RefreshCw className="w-4 h-4 text-red-600 animate-spin" />
+                <span>Processing...</span>
+              </div>
+            </div>
+          )}
 
-          {/* Input Bar */}
-          <div className="p-3 sm:p-4 bg-white border-t border-slate-200">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendQuery();
-              }}
-              className="flex items-center gap-2"
-            >
-              <input
-                type="text"
-                value={inputQuery}
-                onChange={(e) => setInputQuery(e.target.value)}
-                placeholder="Ask Bahu AI Assistant (e.g. 'How much fuel sold today?', 'What is net profit?')..."
-                className="flex-1 px-4 py-3 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 placeholder-slate-400 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all outline-none"
-                disabled={isLoading}
-              />
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Input Bar with Text, Send and Voice Microphone Buttons */}
+        <div className="p-3 sm:p-4 bg-white border-t border-slate-200 space-y-2">
+          {voiceError && (
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center justify-between">
+              <span>⚠️ {voiceError}</span>
               <button
-                type="submit"
-                disabled={isLoading || !inputQuery.trim()}
-                className="px-4 sm:px-6 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition-all disabled:opacity-50 shadow-md cursor-pointer shrink-0"
+                type="button"
+                onClick={() => setVoiceError(null)}
+                className="text-amber-700 hover:text-amber-950 underline font-bold text-[11px] ml-2 cursor-pointer"
               >
-                {isLoading ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    <span className="hidden sm:inline">Ask AI</span>
-                  </>
-                )}
+                Dismiss
               </button>
-            </form>
-          </div>
+            </div>
+          )}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendQuery();
+            }}
+            className="flex items-center gap-2"
+          >
+            <input
+              type="text"
+              value={inputQuery}
+              onChange={(e) => setInputQuery(e.target.value)}
+              placeholder={isListening ? 'Listening... Speak now' : 'Ask question or speak command...'}
+              className={`flex-1 px-4 py-3 rounded-xl border text-xs sm:text-sm font-medium transition-all outline-none ${
+                isListening
+                  ? 'bg-red-50 border-red-400 text-red-900 placeholder-red-400 ring-2 ring-red-300 animate-pulse'
+                  : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-blue-600 focus:bg-white'
+              }`}
+              disabled={isLoading}
+            />
+
+            {/* Microphone Button */}
+            <button
+              type="button"
+              onClick={toggleVoiceInput}
+              disabled={isLoading}
+              className={`p-3 rounded-xl border font-bold text-xs sm:text-sm transition-all flex items-center justify-center cursor-pointer ${
+                isListening
+                  ? 'bg-red-600 text-white border-red-700 animate-bounce shadow-md ring-2 ring-red-400'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+              }`}
+              title={isListening ? 'Stop Listening' : 'Voice Input (English, Urdu, Roman Urdu)'}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-red-600" />}
+            </button>
+
+            {/* Send Button */}
+            <button
+              type="submit"
+              disabled={isLoading || !inputQuery.trim()}
+              className="px-4 sm:px-5 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition-all disabled:opacity-50 shadow-md cursor-pointer shrink-0"
+            >
+              {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </form>
         </div>
       </div>
     </div>

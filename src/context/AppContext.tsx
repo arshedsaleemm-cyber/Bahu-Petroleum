@@ -15,6 +15,7 @@ import {
   syncSaveDoc,
   syncDeleteDoc,
   syncSaveSingleton,
+  ensureDatabaseInitialized,
 } from '../lib/firestoreSync';
 import {
   User,
@@ -373,6 +374,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     testFirestoreConnection();
 
+    const seedDataMap = {
+      users: initialUsers,
+      tanks: initialTanks,
+      deliveries: initialDeliveries,
+      lubricants: initialLubricants,
+      workers: initialWorkers,
+      attendance: initialAttendance,
+      salaries: initialSalaries,
+      udhaarCustomers: initialUdhaarCustomers,
+      categories: initialCategories,
+      expenses: initialExpenses,
+      bankAccounts: initialBankAccounts,
+      bankTransactions: initialBankTransactions,
+      creditCardSales: initialCreditCardSales,
+      infiniCardSales: initialInfiniCardSales,
+      shops: initialShops,
+      rentalAgreements: initialRentalAgreements,
+      notifications: initialNotifications,
+      tyreShopServices: initialTyreServices,
+      carWashServices: initialCarWashServices,
+      tuckShopItems: initialTuckShopItems,
+      restaurantSales: initialRestaurantSales,
+      restaurantExpenses: initialRestaurantExpenses,
+      restaurantStaff: initialRestaurantStaff,
+      restaurantAttendance: initialRestaurantAttendance,
+      restaurantSalaries: initialRestaurantSalaries,
+      restaurantSuppliers: initialRestaurantSuppliers,
+      restaurantInventory: initialRestaurantInventory,
+      restaurantPurchases: initialRestaurantPurchases,
+      restaurantDeposits: initialRestaurantDeposits,
+      dailySalesEntries: initialDailySalesEntries,
+    };
+
+    const singletonDataMap = {
+      'singletons/cashRegister': initialCashRegister,
+    };
+
+    // Ensure first time seeding runs if cloud DB is blank
+    ensureDatabaseInitialized(seedDataMap, singletonDataMap);
+
     const updateSyncTime = () => {
       setSyncStatus(prev => ({
         ...prev,
@@ -388,40 +429,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const unsubs: (() => void)[] = [];
 
-    unsubs.push(subscribeToCollection<User>('users', wrapSetter(setUsers), initialUsers));
-    unsubs.push(subscribeToCollection<Tank>('tanks', wrapSetter(setTanks), initialTanks));
-    unsubs.push(subscribeToCollection<FuelDelivery>('deliveries', wrapSetter(setDeliveries), initialDeliveries));
-    unsubs.push(subscribeToCollection<LubricantProduct>('lubricants', wrapSetter(setLubricants), initialLubricants));
-    unsubs.push(subscribeToCollection<Worker>('workers', wrapSetter(setWorkers), initialWorkers));
-    unsubs.push(subscribeToCollection<AttendanceRecord>('attendance', wrapSetter(setAttendance), initialAttendance));
-    unsubs.push(subscribeToCollection<SalaryRecord>('salaries', wrapSetter(setSalaries), initialSalaries));
-    unsubs.push(subscribeToCollection<UdhaarCustomer>('udhaarCustomers', wrapSetter(setUdhaarCustomers), initialUdhaarCustomers));
-    unsubs.push(subscribeToCollection<ExpenseCategory>('categories', wrapSetter(setCategories), initialCategories));
-    unsubs.push(subscribeToCollection<Expense>('expenses', wrapSetter(setExpenses), initialExpenses));
-    unsubs.push(subscribeToCollection<BankAccount>('bankAccounts', wrapSetter(setBankAccounts), initialBankAccounts));
-    unsubs.push(subscribeToCollection<BankTransaction>('bankTransactions', wrapSetter(setBankTransactions), initialBankTransactions));
-    unsubs.push(subscribeToDoc<CashRegister>('singletons/cashRegister', wrapSetter(setCashRegister), initialCashRegister));
-    unsubs.push(subscribeToCollection<CreditCardTransaction>('creditCardSales', wrapSetter(setCreditCardSales), initialCreditCardSales));
-    unsubs.push(subscribeToCollection<InfiniCardTransaction>('infiniCardSales', wrapSetter(setInfiniCardSales), initialInfiniCardSales));
-    unsubs.push(subscribeToCollection<ShopModuleData>('shops', wrapSetter(setShops), initialShops));
-    unsubs.push(subscribeToCollection<RentalAgreement>('rentalAgreements', wrapSetter(setRentalAgreements), initialRentalAgreements));
-    unsubs.push(subscribeToCollection<AppNotification>('notifications', wrapSetter(setNotifications), initialNotifications));
+    unsubs.push(subscribeToCollection<User>('users', wrapSetter(setUsers)));
+    unsubs.push(subscribeToCollection<Tank>('tanks', wrapSetter(setTanks)));
+    unsubs.push(subscribeToCollection<FuelDelivery>('deliveries', wrapSetter(setDeliveries)));
+    unsubs.push(subscribeToCollection<LubricantProduct>('lubricants', wrapSetter(setLubricants)));
+    unsubs.push(subscribeToCollection<Worker>('workers', wrapSetter(setWorkers)));
+    unsubs.push(subscribeToCollection<AttendanceRecord>('attendance', wrapSetter(setAttendance)));
+    unsubs.push(subscribeToCollection<SalaryRecord>('salaries', wrapSetter(setSalaries)));
+    unsubs.push(subscribeToCollection<UdhaarCustomer>('udhaarCustomers', wrapSetter(setUdhaarCustomers)));
+    unsubs.push(subscribeToCollection<ExpenseCategory>('categories', wrapSetter(setCategories)));
+    unsubs.push(subscribeToCollection<Expense>('expenses', wrapSetter(setExpenses)));
+    unsubs.push(subscribeToCollection<BankAccount>('bankAccounts', wrapSetter(setBankAccounts)));
+    unsubs.push(subscribeToCollection<BankTransaction>('bankTransactions', wrapSetter(setBankTransactions)));
+    unsubs.push(subscribeToDoc<CashRegister>('singletons/cashRegister', wrapSetter(setCashRegister)));
+    unsubs.push(subscribeToCollection<CreditCardTransaction>('creditCardSales', wrapSetter(setCreditCardSales)));
+    unsubs.push(subscribeToCollection<InfiniCardTransaction>('infiniCardSales', wrapSetter(setInfiniCardSales)));
+    unsubs.push(subscribeToCollection<ShopModuleData>('shops', wrapSetter(setShops)));
+    unsubs.push(subscribeToCollection<RentalAgreement>('rentalAgreements', wrapSetter(setRentalAgreements)));
+    unsubs.push(subscribeToCollection<AppNotification>('notifications', wrapSetter(setNotifications)));
 
-    unsubs.push(subscribeToCollection<TyreShopService>('tyreShopServices', wrapSetter(setTyreShopServices), initialTyreServices));
-    unsubs.push(subscribeToCollection<CarWashService>('carWashServices', wrapSetter(setCarWashServices), initialCarWashServices));
-    unsubs.push(subscribeToCollection<TuckShopItem>('tuckShopItems', wrapSetter(setTuckShopItems), initialTuckShopItems));
+    unsubs.push(subscribeToCollection<TyreShopService>('tyreShopServices', wrapSetter(setTyreShopServices)));
+    unsubs.push(subscribeToCollection<CarWashService>('carWashServices', wrapSetter(setCarWashServices)));
+    unsubs.push(subscribeToCollection<TuckShopItem>('tuckShopItems', wrapSetter(setTuckShopItems)));
 
-    unsubs.push(subscribeToCollection<RestaurantSale>('restaurantSales', wrapSetter(setRestaurantSales), initialRestaurantSales));
-    unsubs.push(subscribeToCollection<RestaurantExpense>('restaurantExpenses', wrapSetter(setRestaurantExpenses), initialRestaurantExpenses));
-    unsubs.push(subscribeToCollection<RestaurantStaff>('restaurantStaff', wrapSetter(setRestaurantStaff), initialRestaurantStaff));
-    unsubs.push(subscribeToCollection<RestaurantAttendance>('restaurantAttendance', wrapSetter(setRestaurantAttendance), initialRestaurantAttendance));
-    unsubs.push(subscribeToCollection<RestaurantSalaryRecord>('restaurantSalaries', wrapSetter(setRestaurantSalaries), initialRestaurantSalaries));
-    unsubs.push(subscribeToCollection<RestaurantSupplier>('restaurantSuppliers', wrapSetter(setRestaurantSuppliers), initialRestaurantSuppliers));
-    unsubs.push(subscribeToCollection<RestaurantKitchenInventory>('restaurantInventory', wrapSetter(setRestaurantInventory), initialRestaurantInventory));
-    unsubs.push(subscribeToCollection<RestaurantPurchase>('restaurantPurchases', wrapSetter(setRestaurantPurchases), initialRestaurantPurchases));
-    unsubs.push(subscribeToCollection<RestaurantDeposit>('restaurantDeposits', wrapSetter(setRestaurantDeposits), initialRestaurantDeposits));
+    unsubs.push(subscribeToCollection<RestaurantSale>('restaurantSales', wrapSetter(setRestaurantSales)));
+    unsubs.push(subscribeToCollection<RestaurantExpense>('restaurantExpenses', wrapSetter(setRestaurantExpenses)));
+    unsubs.push(subscribeToCollection<RestaurantStaff>('restaurantStaff', wrapSetter(setRestaurantStaff)));
+    unsubs.push(subscribeToCollection<RestaurantAttendance>('restaurantAttendance', wrapSetter(setRestaurantAttendance)));
+    unsubs.push(subscribeToCollection<RestaurantSalaryRecord>('restaurantSalaries', wrapSetter(setRestaurantSalaries)));
+    unsubs.push(subscribeToCollection<RestaurantSupplier>('restaurantSuppliers', wrapSetter(setRestaurantSuppliers)));
+    unsubs.push(subscribeToCollection<RestaurantKitchenInventory>('restaurantInventory', wrapSetter(setRestaurantInventory)));
+    unsubs.push(subscribeToCollection<RestaurantPurchase>('restaurantPurchases', wrapSetter(setRestaurantPurchases)));
+    unsubs.push(subscribeToCollection<RestaurantDeposit>('restaurantDeposits', wrapSetter(setRestaurantDeposits)));
 
-    unsubs.push(subscribeToCollection<DailySalesEntry>('dailySalesEntries', wrapSetter(setDailySalesEntries), initialDailySalesEntries));
+    unsubs.push(subscribeToCollection<DailySalesEntry>('dailySalesEntries', wrapSetter(setDailySalesEntries)));
 
     return () => {
       unsubs.forEach(unsub => unsub());

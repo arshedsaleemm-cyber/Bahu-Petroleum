@@ -28,30 +28,48 @@ export const FuelInventoryView: React.FC = () => {
   const [dipNotes, setDipNotes] = useState<string>('');
   const [isDipModalOpen, setIsDipModalOpen] = useState<boolean>(false);
 
-  const petrolTanks = tanks.filter(t => t.fuelType === 'Petrol');
-  const dieselTanks = tanks.filter(t => t.fuelType === 'Diesel');
+  const superPetrolTanks = tanks.filter(t => t.fuelType === 'Super Petrol' || (t.fuelType as string) === 'Petrol');
+  const hsdTanks = tanks.filter(t => t.fuelType === 'High-Speed Diesel (HSD)' || (t.fuelType as string) === 'Diesel');
+  const excelliumTanks = tanks.filter(t => t.fuelType === 'Excellium High-Octane');
 
-  const petrolCurrent = petrolTanks.reduce((a, b) => a + b.currentFuel, 0);
-  const petrolCapacity = petrolTanks.reduce((a, b) => a + b.capacity, 0);
-  const petrolOpening = petrolTanks.reduce((a, b) => a + b.openingStock, 0);
+  const superPetrolCurrent = superPetrolTanks.reduce((a, b) => a + b.currentFuel, 0);
+  const superPetrolCapacity = superPetrolTanks.reduce((a, b) => a + b.capacity, 0);
+  const superPetrolOpening = superPetrolTanks.reduce((a, b) => a + b.openingStock, 0);
 
-  const dieselCurrent = dieselTanks.reduce((a, b) => a + b.currentFuel, 0);
-  const dieselCapacity = dieselTanks.reduce((a, b) => a + b.capacity, 0);
-  const dieselOpening = dieselTanks.reduce((a, b) => a + b.openingStock, 0);
+  const hsdCurrent = hsdTanks.reduce((a, b) => a + b.currentFuel, 0);
+  const hsdCapacity = hsdTanks.reduce((a, b) => a + b.capacity, 0);
+  const hsdOpening = hsdTanks.reduce((a, b) => a + b.openingStock, 0);
 
-  const petrolReceived = deliveries.reduce((acc, curr) => acc + (curr.petrolLiters || 0), 0);
-  const dieselReceived = deliveries.reduce((acc, curr) => acc + (curr.dieselLiters || 0), 0);
+  const excelliumCurrent = excelliumTanks.reduce((a, b) => a + b.currentFuel, 0);
+  const excelliumCapacity = excelliumTanks.reduce((a, b) => a + b.capacity, 0);
+  const excelliumOpening = excelliumTanks.reduce((a, b) => a + b.openingStock, 0);
+
+  const superPetrolReceived = deliveries
+    .filter(d => d.fuelType === 'Super Petrol' || (d.fuelType as string) === 'Petrol')
+    .reduce((acc, curr) => acc + (curr.totalLitersReceived || curr.petrolLiters || 0), 0);
+
+  const hsdReceived = deliveries
+    .filter(d => d.fuelType === 'High-Speed Diesel (HSD)' || (d.fuelType as string) === 'Diesel')
+    .reduce((acc, curr) => acc + (curr.totalLitersReceived || curr.dieselLiters || 0), 0);
+
+  const excelliumReceived = deliveries
+    .filter(d => d.fuelType === 'Excellium High-Octane')
+    .reduce((acc, curr) => acc + (curr.totalLitersReceived || 0), 0);
 
   // Calculate sold liters based on Opening Stock + Total Received - Current Closing Stock
-  const petrolSold = Math.max(0, petrolOpening + petrolReceived - petrolCurrent);
-  const dieselSold = Math.max(0, dieselOpening + dieselReceived - dieselCurrent);
+  const superPetrolSold = Math.max(0, superPetrolOpening + superPetrolReceived - superPetrolCurrent);
+  const hsdSold = Math.max(0, hsdOpening + hsdReceived - hsdCurrent);
+  const excelliumSold = Math.max(0, excelliumOpening + excelliumReceived - excelliumCurrent);
 
   // Infini card fuel liters sold
-  const petrolInfiniLiters = (infiniCardSales || [])
-    .filter(s => s.fuelType === 'Petrol')
+  const superPetrolInfiniLiters = (infiniCardSales || [])
+    .filter(s => (s.fuelType as string) === 'Super Petrol' || (s.fuelType as string) === 'Petrol')
     .reduce((a, b) => a + (b.liters || 0), 0);
-  const dieselInfiniLiters = (infiniCardSales || [])
-    .filter(s => s.fuelType === 'Diesel')
+  const hsdInfiniLiters = (infiniCardSales || [])
+    .filter(s => (s.fuelType as string) === 'High-Speed Diesel (HSD)' || (s.fuelType as string) === 'Diesel')
+    .reduce((a, b) => a + (b.liters || 0), 0);
+  const excelliumInfiniLiters = (infiniCardSales || [])
+    .filter(s => (s.fuelType as string) === 'Excellium High-Octane')
     .reduce((a, b) => a + (b.liters || 0), 0);
 
   const openDipModal = (tank: Tank) => {
@@ -79,8 +97,8 @@ export const FuelInventoryView: React.FC = () => {
     setIsDipModalOpen(false);
   };
 
-  const totalFuelAvailable = petrolCurrent + dieselCurrent;
-  const totalFuelCapacity = petrolCapacity + dieselCapacity;
+  const totalFuelAvailable = superPetrolCurrent + hsdCurrent + excelliumCurrent;
+  const totalFuelCapacity = superPetrolCapacity + hsdCapacity + excelliumCapacity;
   const totalFuelShortage = deliveries.reduce((a, b) => a + (b.shortageLiters || 0), 0);
 
   return (
@@ -115,15 +133,15 @@ export const FuelInventoryView: React.FC = () => {
       </div>
 
       {/* Overall Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-blue-900 to-blue-950 text-white p-5 rounded-2xl shadow-md border border-blue-800">
           <div className="flex items-center justify-between text-blue-200 text-xs font-bold uppercase tracking-wider mb-2">
-            <span>Total Fuel Stock Available</span>
+            <span>Total Fuel Stock</span>
             <Gauge className="w-4 h-4 text-blue-400" />
           </div>
-          <div className="text-2xl font-black">{formatLiters(totalFuelAvailable)}</div>
+          <div className="text-xl font-black">{formatLiters(totalFuelAvailable)}</div>
           <div className="text-xs text-blue-200/80 mt-1 flex items-center justify-between">
-            <span>Out of {formatLiters(totalFuelCapacity)} Total Tank Space</span>
+            <span>Max {formatLiters(totalFuelCapacity)}</span>
             <span className="font-extrabold text-emerald-400">
               {Math.round((totalFuelAvailable / (totalFuelCapacity || 1)) * 100)}% Capacity
             </span>
@@ -132,25 +150,37 @@ export const FuelInventoryView: React.FC = () => {
 
         <div className="bg-gradient-to-br from-red-900 to-red-950 text-white p-5 rounded-2xl shadow-md border border-red-800">
           <div className="flex items-center justify-between text-red-200 text-xs font-bold uppercase tracking-wider mb-2">
-            <span>Super Petrol Reserve</span>
+            <span>Super Petrol</span>
             <Fuel className="w-4 h-4 text-red-400" />
           </div>
-          <div className="text-2xl font-black">{formatLiters(petrolCurrent)}</div>
+          <div className="text-xl font-black">{formatLiters(superPetrolCurrent)}</div>
           <div className="text-xs text-red-200/80 mt-1 flex items-center justify-between">
-            <span>Ullage: {formatLiters(petrolCapacity - petrolCurrent)}</span>
-            <span className="font-bold">{petrolTanks.length} Tanks Online</span>
+            <span>Ullage: {formatLiters(superPetrolCapacity - superPetrolCurrent)}</span>
+            <span className="font-bold">{superPetrolTanks.length} Tanks</span>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white p-5 rounded-2xl shadow-md border border-slate-800">
           <div className="flex items-center justify-between text-slate-300 text-xs font-bold uppercase tracking-wider mb-2">
-            <span>High Speed Diesel Reserve</span>
+            <span>High Speed Diesel (HSD)</span>
             <Droplet className="w-4 h-4 text-blue-400" />
           </div>
-          <div className="text-2xl font-black">{formatLiters(dieselCurrent)}</div>
+          <div className="text-xl font-black">{formatLiters(hsdCurrent)}</div>
           <div className="text-xs text-slate-300/80 mt-1 flex items-center justify-between">
-            <span>Ullage: {formatLiters(dieselCapacity - dieselCurrent)}</span>
-            <span className="font-bold">{dieselTanks.length} Tanks Online</span>
+            <span>Ullage: {formatLiters(hsdCapacity - hsdCurrent)}</span>
+            <span className="font-bold">{hsdTanks.length} Tanks</span>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-900 to-teal-950 text-white p-5 rounded-2xl shadow-md border border-emerald-800">
+          <div className="flex items-center justify-between text-emerald-200 text-xs font-bold uppercase tracking-wider mb-2">
+            <span>Excellium High-Octane</span>
+            <Fuel className="w-4 h-4 text-teal-300" />
+          </div>
+          <div className="text-xl font-black">{formatLiters(excelliumCurrent)}</div>
+          <div className="text-xs text-emerald-200/80 mt-1 flex items-center justify-between">
+            <span>Ullage: {formatLiters(excelliumCapacity - excelliumCurrent)}</span>
+            <span className="font-bold">{excelliumTanks.length} Tanks</span>
           </div>
         </div>
       </div>
@@ -165,41 +195,41 @@ export const FuelInventoryView: React.FC = () => {
             <div>
               <h3 className="font-extrabold text-slate-900 text-base">Super Petrol Stock Breakdown</h3>
               <p className="text-xs text-slate-500">
-                Opening Stock ({formatLiters(petrolOpening)}) + Received ({formatLiters(petrolReceived)}) - Sold (
-                {formatLiters(petrolSold)})
+                Opening Stock ({formatLiters(superPetrolOpening)}) + Received ({formatLiters(superPetrolReceived)}) - Sold (
+                {formatLiters(superPetrolSold)})
               </p>
             </div>
           </div>
           <span className="px-3.5 py-1.5 rounded-full bg-red-100 text-red-700 font-extrabold text-xs border border-red-200">
-            {formatLiters(petrolCurrent)} Closing Stock
+            {formatLiters(superPetrolCurrent)} Closing Stock
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opening Stock</p>
-            <p className="font-extrabold text-slate-800 text-base mt-1">{formatLiters(petrolOpening)}</p>
+            <p className="font-extrabold text-slate-800 text-base mt-1">{formatLiters(superPetrolOpening)}</p>
           </div>
           <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-100">
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">+ Received Stock</p>
-            <p className="font-extrabold text-emerald-800 text-base mt-1">{formatLiters(petrolReceived)}</p>
+            <p className="font-extrabold text-emerald-800 text-base mt-1">{formatLiters(superPetrolReceived)}</p>
           </div>
           <div className="bg-rose-50 p-3.5 rounded-xl border border-rose-100">
             <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">- Total Sold Stock</p>
-            <p className="font-extrabold text-rose-800 text-base mt-1">{formatLiters(petrolSold)}</p>
-            {petrolInfiniLiters > 0 && (
+            <p className="font-extrabold text-rose-800 text-base mt-1">{formatLiters(superPetrolSold)}</p>
+            {superPetrolInfiniLiters > 0 && (
               <p className="text-[10px] text-rose-600/80 font-medium mt-0.5">
-                (Incl. {formatLiters(petrolInfiniLiters)} Infini)
+                (Incl. {formatLiters(superPetrolInfiniLiters)} Infini)
               </p>
             )}
           </div>
           <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-100">
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">= Current Stock (Dip)</p>
-            <p className="font-extrabold text-blue-900 text-base mt-1">{formatLiters(petrolCurrent)}</p>
+            <p className="font-extrabold text-blue-900 text-base mt-1">{formatLiters(superPetrolCurrent)}</p>
           </div>
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Storage Capacity</p>
-            <p className="font-extrabold text-slate-700 text-base mt-1">{formatLiters(petrolCapacity)}</p>
+            <p className="font-extrabold text-slate-700 text-base mt-1">{formatLiters(superPetrolCapacity)}</p>
           </div>
         </div>
       </div>
@@ -212,43 +242,92 @@ export const FuelInventoryView: React.FC = () => {
               <Droplet className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-extrabold text-slate-900 text-base">High Speed Diesel Stock Breakdown</h3>
+              <h3 className="font-extrabold text-slate-900 text-base">High-Speed Diesel (HSD) Stock Breakdown</h3>
               <p className="text-xs text-slate-500">
-                Opening Stock ({formatLiters(dieselOpening)}) + Received ({formatLiters(dieselReceived)}) - Sold (
-                {formatLiters(dieselSold)})
+                Opening Stock ({formatLiters(hsdOpening)}) + Received ({formatLiters(hsdReceived)}) - Sold (
+                {formatLiters(hsdSold)})
               </p>
             </div>
           </div>
           <span className="px-3.5 py-1.5 rounded-full bg-blue-100 text-blue-800 font-extrabold text-xs border border-blue-200">
-            {formatLiters(dieselCurrent)} Closing Stock
+            {formatLiters(hsdCurrent)} Closing Stock
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opening Stock</p>
-            <p className="font-extrabold text-slate-800 text-base mt-1">{formatLiters(dieselOpening)}</p>
+            <p className="font-extrabold text-slate-800 text-base mt-1">{formatLiters(hsdOpening)}</p>
           </div>
           <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-100">
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">+ Received Stock</p>
-            <p className="font-extrabold text-emerald-800 text-base mt-1">{formatLiters(dieselReceived)}</p>
+            <p className="font-extrabold text-emerald-800 text-base mt-1">{formatLiters(hsdReceived)}</p>
           </div>
           <div className="bg-rose-50 p-3.5 rounded-xl border border-rose-100">
             <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">- Total Sold Stock</p>
-            <p className="font-extrabold text-rose-800 text-base mt-1">{formatLiters(dieselSold)}</p>
-            {dieselInfiniLiters > 0 && (
+            <p className="font-extrabold text-rose-800 text-base mt-1">{formatLiters(hsdSold)}</p>
+            {hsdInfiniLiters > 0 && (
               <p className="text-[10px] text-rose-600/80 font-medium mt-0.5">
-                (Incl. {formatLiters(dieselInfiniLiters)} Infini)
+                (Incl. {formatLiters(hsdInfiniLiters)} Infini)
               </p>
             )}
           </div>
           <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-100">
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">= Current Stock (Dip)</p>
-            <p className="font-extrabold text-blue-900 text-base mt-1">{formatLiters(dieselCurrent)}</p>
+            <p className="font-extrabold text-blue-900 text-base mt-1">{formatLiters(hsdCurrent)}</p>
           </div>
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Storage Capacity</p>
-            <p className="font-extrabold text-slate-700 text-base mt-1">{formatLiters(dieselCapacity)}</p>
+            <p className="font-extrabold text-slate-700 text-base mt-1">{formatLiters(hsdCapacity)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Excellium High-Octane Inventory Section */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700">
+              <Fuel className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-slate-900 text-base">Excellium High-Octane Stock Breakdown</h3>
+              <p className="text-xs text-slate-500">
+                Opening Stock ({formatLiters(excelliumOpening)}) + Received ({formatLiters(excelliumReceived)}) - Sold (
+                {formatLiters(excelliumSold)})
+              </p>
+            </div>
+          </div>
+          <span className="px-3.5 py-1.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-xs border border-emerald-200">
+            {formatLiters(excelliumCurrent)} Closing Stock
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opening Stock</p>
+            <p className="font-extrabold text-slate-800 text-base mt-1">{formatLiters(excelliumOpening)}</p>
+          </div>
+          <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-100">
+            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">+ Received Stock</p>
+            <p className="font-extrabold text-emerald-800 text-base mt-1">{formatLiters(excelliumReceived)}</p>
+          </div>
+          <div className="bg-rose-50 p-3.5 rounded-xl border border-rose-100">
+            <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">- Total Sold Stock</p>
+            <p className="font-extrabold text-rose-800 text-base mt-1">{formatLiters(excelliumSold)}</p>
+            {excelliumInfiniLiters > 0 && (
+              <p className="text-[10px] text-rose-600/80 font-medium mt-0.5">
+                (Incl. {formatLiters(excelliumInfiniLiters)} Infini)
+              </p>
+            )}
+          </div>
+          <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-100">
+            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">= Current Stock (Dip)</p>
+            <p className="font-extrabold text-blue-900 text-base mt-1">{formatLiters(excelliumCurrent)}</p>
+          </div>
+          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Storage Capacity</p>
+            <p className="font-extrabold text-slate-700 text-base mt-1">{formatLiters(excelliumCapacity)}</p>
           </div>
         </div>
       </div>
@@ -296,7 +375,9 @@ export const FuelInventoryView: React.FC = () => {
                     <td className="p-3.5">
                       <span
                         className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                          tank.fuelType === 'Petrol'
+                          tank.fuelType === 'Excellium High-Octane'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : tank.fuelType === 'Super Petrol' || (tank.fuelType as string) === 'Petrol'
                             ? 'bg-red-100 text-red-700'
                             : 'bg-blue-100 text-blue-800'
                         }`}
@@ -317,7 +398,7 @@ export const FuelInventoryView: React.FC = () => {
                             className={`h-full transition-all duration-500 ${
                               isLow
                                 ? 'bg-red-600'
-                                : tank.fuelType === 'Petrol'
+                                : tank.fuelType === 'Super Petrol' || (tank.fuelType as string) === 'Petrol'
                                 ? 'bg-red-500'
                                 : 'bg-blue-600'
                             }`}

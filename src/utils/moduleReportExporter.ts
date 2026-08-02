@@ -80,26 +80,72 @@ export const exportModulePDF = (
     }
 
     case 'FUEL_SALES': {
-      const sales = (appState.dailySalesEntries || []).filter((e: any) => isDateInRange(e.date, range));
-      const totalSalesAmt = sales.reduce((sum: number, e: any) => sum + (e.totalSales || 0), 0);
+      const fuelSales = (appState.fuelSales || []).filter((s: any) => isDateInRange(s.date, range));
+      const dailyEntries = (appState.dailySalesEntries || []).filter((e: any) => isDateInRange(e.date, range));
+
+      const totalLiters = fuelSales.reduce((sum: number, s: any) => sum + (s.quantityLiters || 0), 0);
+      const totalFuelSalesAmt = fuelSales.reduce((sum: number, s: any) => sum + (s.totalSaleAmount || 0), 0);
+      const totalDailySalesAmt = dailyEntries.reduce((sum: number, e: any) => sum + (e.totalSales || 0), 0);
+
+      // Fuel type breakdown
+      const fuelTypes = ['Super Petrol', 'High-Speed Diesel (HSD)', 'Excellium High-Octane'];
+      const fuelTypeRows = fuelTypes.map(ft => {
+        const ftSales = fuelSales.filter((s: any) => s.fuelType === ft);
+        const ltrs = ftSales.reduce((a: number, b: any) => a + (b.quantityLiters || 0), 0);
+        const amt = ftSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
+        return [ft, formatLiters(ltrs), formatCurrency(amt), `${ftSales.length} Transactions`];
+      });
+
+      // Tank-wise breakdown
+      const tankMap: Record<string, { tankName: string; liters: number; amount: number; count: number }> = {};
+      fuelSales.forEach((s: any) => {
+        const tName = s.tankName || 'Tank ' + s.tankId;
+        if (!tankMap[tName]) {
+          tankMap[tName] = { tankName: tName, liters: 0, amount: 0, count: 0 };
+        }
+        tankMap[tName].liters += s.quantityLiters || 0;
+        tankMap[tName].amount += s.totalSaleAmount || 0;
+        tankMap[tName].count += 1;
+      });
+
+      const tankRows = Object.values(tankMap).map(t => [
+        t.tankName,
+        formatLiters(t.liters),
+        formatCurrency(t.amount),
+        `${t.count} Entries`,
+      ]);
 
       const sections: PDFSection[] = [
         {
-          title: 'Daily Petrol & Fuel Cash Sales Log',
+          title: 'Fuel Sales Summary',
           summaryCards: [
-            { label: 'Total Sales Entries', value: `${sales.length} Logged` },
-            { label: 'Total Revenue Collected', value: formatCurrency(totalSalesAmt) },
+            { label: 'Total Litres Sold', value: formatLiters(totalLiters) },
+            { label: 'Fuel Sales Revenue', value: formatCurrency(totalFuelSalesAmt) },
+            { label: 'Total Transactions', value: `${fuelSales.length} Entries` },
           ],
-          headers: ['Date', 'Business Section', 'Sales Amount', 'Recorded By', 'Notes'],
-          rows: sales.map((e: any) => [
-            e.date,
-            e.section || 'Main Dispenser',
-            formatCurrency(e.totalSales || 0),
-            e.createdBy || 'Admin',
-            e.notes || '-',
+          headers: ['Fuel Type', 'Quantity Sold', 'Total Revenue', 'Transaction Count'],
+          rows: fuelTypeRows,
+        },
+        {
+          title: 'Tank-wise Fuel Sales Breakdown',
+          headers: ['Tank Name', 'Total Litres Sold', 'Total Sales Amount', 'Sales Entries'],
+          rows: tankRows.length > 0 ? tankRows : [['No Tank Data', '0 L', 'PKR 0', '0 Entries']],
+        },
+        {
+          title: 'Detailed Fuel Sales Log',
+          headers: ['Date', 'Fuel Type', 'Tank', 'Litres Sold', 'Rate/L', 'Total Sale', 'Recorded By'],
+          rows: fuelSales.map((s: any) => [
+            s.date,
+            s.fuelType,
+            s.tankName || 'Tank',
+            formatLiters(s.quantityLiters),
+            s.sellingPricePerLiter ? `PKR ${s.sellingPricePerLiter}/L` : '-',
+            formatCurrency(s.totalSaleAmount),
+            s.createdBy || 'System',
           ]),
         },
       ];
+
       generateProfessionalPDF('Fuel Sales Report', label, sections, 'Fuel_Sales_Report');
       break;
     }

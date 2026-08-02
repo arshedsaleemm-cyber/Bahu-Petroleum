@@ -10,6 +10,7 @@ import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { LoginView } from './components/modules/LoginView';
 import { DashboardView } from './components/modules/DashboardView';
 import { FuelDeliveriesView } from './components/modules/FuelDeliveriesView';
+import { FuelSalesView } from './components/modules/FuelSalesView';
 import { FuelInventoryView } from './components/modules/FuelInventoryView';
 import { TankManagementView } from './components/modules/TankManagementView';
 import { LubricantsView } from './components/modules/LubricantsView';
@@ -46,6 +47,9 @@ const MainLayout: React.FC = () => {
         return <BahuAIAssistantView />;
       case 'deliveries':
         return <FuelDeliveriesView />;
+      case 'fuel_sales':
+      case 'fuelsales':
+        return <FuelSalesView />;
       case 'inventory':
         return <FuelInventoryView />;
       case 'tanks':

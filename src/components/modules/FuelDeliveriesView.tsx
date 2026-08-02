@@ -39,9 +39,8 @@ export const FuelDeliveriesView: React.FC = () => {
   // Form State
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().slice(0, 10));
   const [deliveryTime, setDeliveryTime] = useState('11:00 AM');
-  const [fuelType, setFuelType] = useState<FuelType>('Petrol');
-  const [petrolLiters, setPetrolLiters] = useState<number>(10000);
-  const [dieselLiters, setDieselLiters] = useState<number>(0);
+  const [fuelType, setFuelType] = useState<FuelType>('Super Petrol');
+  const [quantityLiters, setQuantityLiters] = useState<number>(10000);
   const [fuelRate, setFuelRate] = useState<number>(252.75);
   const [supplierName, setSupplierName] = useState('Pakistan State Oil (PSO)');
   const [invoiceNumber, setInvoiceNumber] = useState(`PSO-INV-${Math.floor(10000 + Math.random() * 90000)}`);
@@ -60,22 +59,21 @@ export const FuelDeliveriesView: React.FC = () => {
   const shortageDip = dipDifference < 0 ? dipDifference : 0; // Only negative values represent shortage
   const estimatedShortageLiters = Math.abs(shortageDip) * 50; // Approx 50L per dip unit
 
-  const quantity = fuelType === 'Petrol' ? petrolLiters : fuelType === 'Diesel' ? dieselLiters : petrolLiters + dieselLiters;
-  const totalPurchaseAmount = quantity * fuelRate;
+  const totalPurchaseAmount = quantityLiters * fuelRate;
 
   const openAddModal = () => {
     setEditingDelivery(null);
     setDeliveryDate(new Date().toISOString().slice(0, 10));
     setDeliveryTime('11:00 AM');
-    setFuelType('Petrol');
-    setPetrolLiters(10000);
-    setDieselLiters(0);
+    setFuelType('Super Petrol');
+    setQuantityLiters(10000);
     setFuelRate(252.75);
     setSupplierName('Pakistan State Oil (PSO)');
     setInvoiceNumber(`PSO-INV-${Math.floor(10000 + Math.random() * 90000)}`);
     setVehicleNumber('');
     setDriverName('');
-    setTankId(tanks[0]?.id || '');
+    const matchingTank = tanks.find(t => t.fuelType === 'Super Petrol') || tanks[0];
+    setTankId(matchingTank?.id || '');
     setExpectedDip(174);
     setActualDip(174);
     setNotes('');
@@ -86,16 +84,11 @@ export const FuelDeliveriesView: React.FC = () => {
     setEditingDelivery(del);
     setDeliveryDate(del.deliveryDate || new Date().toISOString().slice(0, 10));
     setDeliveryTime(del.deliveryTime || '11:00 AM');
-    setFuelType(del.fuelType || 'Petrol');
-    const qty = del.totalLitersReceived || 10000;
-    if (del.fuelType === 'Diesel') {
-      setDieselLiters(qty);
-      setPetrolLiters(0);
-    } else {
-      setPetrolLiters(qty);
-      setDieselLiters(0);
-    }
-    const rate = del.fuelRate || (del.fuelType === 'Petrol' ? del.purchaseRatePetrol : del.purchaseRateDiesel) || (del.totalLitersReceived ? del.totalPurchaseAmount / del.totalLitersReceived : 252.75);
+    const fType: FuelType = (del.fuelType === ('Petrol' as any) ? 'Super Petrol' : del.fuelType === ('Diesel' as any) ? 'High-Speed Diesel (HSD)' : del.fuelType) || 'Super Petrol';
+    setFuelType(fType);
+    const qty = del.totalLitersReceived || del.petrolLiters || del.dieselLiters || 10000;
+    setQuantityLiters(qty);
+    const rate = del.fuelRate || (del.totalLitersReceived ? del.totalPurchaseAmount / del.totalLitersReceived : 252.75);
     setFuelRate(rate);
     setSupplierName(del.supplierName || '');
     setInvoiceNumber(del.invoiceNumber || '');
@@ -116,16 +109,16 @@ export const FuelDeliveriesView: React.FC = () => {
       deliveryDate,
       deliveryTime,
       fuelType,
-      petrolLiters: fuelType === 'Diesel' ? 0 : petrolLiters,
-      dieselLiters: fuelType === 'Petrol' ? 0 : dieselLiters,
+      petrolLiters: fuelType === 'Super Petrol' ? quantityLiters : 0,
+      dieselLiters: fuelType === 'High-Speed Diesel (HSD)' ? quantityLiters : 0,
       supplierName,
       invoiceNumber,
       vehicleNumber,
       driverName,
-      totalLitersReceived: quantity,
+      totalLitersReceived: quantityLiters,
       fuelRate,
-      purchaseRatePetrol: fuelType === 'Diesel' ? 0 : fuelRate,
-      purchaseRateDiesel: fuelType === 'Petrol' ? 0 : fuelRate,
+      purchaseRatePetrol: fuelType === 'Super Petrol' ? fuelRate : 0,
+      purchaseRateDiesel: fuelType === 'High-Speed Diesel (HSD)' ? fuelRate : 0,
       totalPurchaseAmount,
       tankId,
       tankName: selectedTank?.tankName || 'Main Tank',
@@ -165,7 +158,7 @@ export const FuelDeliveriesView: React.FC = () => {
   const handleExportPDF = () => {
     const headers = ['Date', 'Supplier', 'Invoice', 'Fuel Type', 'Quantity', 'Fuel Rate', 'Expected Dip', 'Actual Dip', 'Shortage', 'Total Cost'];
     const rows = filtered.map(d => {
-      const rate = d.fuelRate || (d.fuelType === 'Petrol' ? d.purchaseRatePetrol : d.purchaseRateDiesel) || (d.totalLitersReceived ? d.totalPurchaseAmount / d.totalLitersReceived : 0);
+      const rate = d.fuelRate || ((d.fuelType as string) === 'Petrol' ? d.purchaseRatePetrol : d.purchaseRateDiesel) || (d.totalLitersReceived ? d.totalPurchaseAmount / d.totalLitersReceived : 0);
       return [
         d.deliveryDate,
         d.supplierName,
@@ -274,8 +267,9 @@ export const FuelDeliveriesView: React.FC = () => {
             className="p-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 outline-none"
           >
             <option value="ALL">All Fuel Types</option>
-            <option value="Petrol">Super Petrol</option>
-            <option value="Diesel">High Speed Diesel</option>
+            <option value="Super Petrol">Super Petrol</option>
+            <option value="High-Speed Diesel (HSD)">High-Speed Diesel (HSD)</option>
+            <option value="Excellium High-Octane">Excellium High-Octane</option>
           </select>
         </div>
       </div>
@@ -293,7 +287,7 @@ export const FuelDeliveriesView: React.FC = () => {
         ) : (
           filtered.map(del => {
             const hasShortage = (del.shortageDip || 0) < 0;
-            const rate = del.fuelRate || (del.fuelType === 'Petrol' ? del.purchaseRatePetrol : del.purchaseRateDiesel) || (del.totalLitersReceived ? del.totalPurchaseAmount / del.totalLitersReceived : 0);
+            const rate = del.fuelRate || ((del.fuelType as string) === 'Petrol' ? del.purchaseRatePetrol : del.purchaseRateDiesel) || (del.totalLitersReceived ? del.totalPurchaseAmount / del.totalLitersReceived : 0);
 
             return (
               <div
@@ -450,11 +444,17 @@ export const FuelDeliveriesView: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Fuel Type</label>
                   <select
                     value={fuelType}
-                    onChange={e => setFuelType(e.target.value as FuelType)}
+                    onChange={e => {
+                      const newType = e.target.value as FuelType;
+                      setFuelType(newType);
+                      const matchingTank = tanks.find(t => t.fuelType === newType) || tanks[0];
+                      if (matchingTank) setTankId(matchingTank.id);
+                    }}
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-extrabold outline-none focus:border-red-600"
                   >
-                    <option value="Petrol">Super Petrol</option>
-                    <option value="Diesel">High Speed Diesel</option>
+                    <option value="Super Petrol">Super Petrol</option>
+                    <option value="High-Speed Diesel (HSD)">High-Speed Diesel (HSD)</option>
+                    <option value="Excellium High-Octane">Excellium High-Octane</option>
                   </select>
                 </div>
 
@@ -464,12 +464,8 @@ export const FuelDeliveriesView: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={quantity}
-                    onChange={e => {
-                      const val = Number(e.target.value);
-                      if (fuelType === 'Petrol') setPetrolLiters(val);
-                      else setDieselLiters(val);
-                    }}
+                    value={quantityLiters}
+                    onChange={e => setQuantityLiters(Number(e.target.value))}
                     required
                     min={1}
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-red-600"
@@ -500,7 +496,7 @@ export const FuelDeliveriesView: React.FC = () => {
                     Total Cost (Automatically Calculated)
                   </p>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    {formatLiters(quantity)} × PKR {fuelRate.toFixed(2)}/Litre
+                    {formatLiters(quantityLiters)} × PKR {fuelRate.toFixed(2)}/Litre
                   </p>
                 </div>
                 <div className="text-right">

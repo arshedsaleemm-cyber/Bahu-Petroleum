@@ -13,7 +13,7 @@ export interface User {
   createdAt: string;
 }
 
-export type FuelType = 'Petrol' | 'Diesel' | 'Both';
+export type FuelType = 'Super Petrol' | 'High-Speed Diesel (HSD)' | 'Excellium High-Octane';
 
 export interface FuelDelivery {
   id: string;
@@ -51,7 +51,7 @@ export interface Tank {
   id: string;
   tankName: string;
   name?: string;
-  fuelType: 'Petrol' | 'Diesel';
+  fuelType: FuelType;
   capacity: number; // in Liters
   currentFuel: number; // in Liters
   openingStock: number;
@@ -441,7 +441,22 @@ export interface DailySalesEntry {
   id: string;
   date: string; // YYYY-MM-DD
   section: DailySalesSection;
+  fuelType?: FuelType;
   totalSales: number; // PKR
+  notes?: string;
+  createdBy?: string;
+  createdAt?: string;
+}
+
+export interface FuelSale {
+  id: string;
+  date: string; // YYYY-MM-DD
+  fuelType: FuelType;
+  tankId: string;
+  tankName?: string;
+  quantityLiters: number;
+  sellingPricePerLiter?: number;
+  totalSaleAmount: number; // calculated as quantityLiters * sellingPricePerLiter
   notes?: string;
   createdBy?: string;
   createdAt?: string;

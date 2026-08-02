@@ -27,6 +27,7 @@ import {
   ChevronRight,
   ChefHat,
   Fuel,
+  Flame,
 } from 'lucide-react';
 
 interface NavItem {
@@ -64,6 +65,7 @@ export const MobileNav: React.FC = () => {
       category: 'Executive AI Intelligence',
     },
     { id: 'deliveries', label: 'Fuel Deliveries', icon: Truck, category: 'Fuel Operations' },
+    { id: 'fuel_sales', label: 'Fuel Sales', icon: Flame, category: 'Fuel Operations' },
     { id: 'inventory', label: 'Fuel Inventory', icon: Droplet, category: 'Fuel Operations' },
     {
       id: 'tanks',

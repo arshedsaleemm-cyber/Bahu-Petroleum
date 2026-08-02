@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Tank } from '../../types';
+import { Tank, FuelType } from '../../types';
 import { TankVisualizer } from '../common/TankVisualizer';
 import { formatLiters } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
@@ -17,7 +17,7 @@ export const TankManagementView: React.FC = () => {
 
   // Form State
   const [tankName, setTankName] = useState('');
-  const [fuelType, setFuelType] = useState<'Petrol' | 'Diesel'>('Petrol');
+  const [fuelType, setFuelType] = useState<FuelType>('Super Petrol');
   const [capacity, setCapacity] = useState<number>(25000);
   const [currentFuel, setCurrentFuel] = useState<number>(18000);
   const [openingStock, setOpeningStock] = useState<number>(18000);
@@ -27,7 +27,7 @@ export const TankManagementView: React.FC = () => {
   const openAddModal = () => {
     setEditingTank(null);
     setTankName(`Tank ${tanks.length + 1} - Super Petrol`);
-    setFuelType('Petrol');
+    setFuelType('Super Petrol');
     setCapacity(25000);
     setCurrentFuel(15000);
     setOpeningStock(15000);
@@ -198,11 +198,12 @@ export const TankManagementView: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Fuel Type</label>
                   <select
                     value={fuelType}
-                    onChange={e => setFuelType(e.target.value as 'Petrol' | 'Diesel')}
+                    onChange={e => setFuelType(e.target.value as FuelType)}
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-blue-600"
                   >
-                    <option value="Petrol">Super Petrol</option>
-                    <option value="Diesel">High Speed Diesel</option>
+                    <option value="Super Petrol">Super Petrol</option>
+                    <option value="High-Speed Diesel (HSD)">High-Speed Diesel (HSD)</option>
+                    <option value="Excellium High-Octane">Excellium High-Octane</option>
                   </select>
                 </div>
                 <div>

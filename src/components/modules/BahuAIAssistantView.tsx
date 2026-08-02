@@ -54,6 +54,8 @@ export const BahuAIAssistantView: React.FC = () => {
     restaurantSales,
     addRestaurantSale,
     udhaarCustomers,
+    fuelSales,
+    addFuelSale,
   } = useApp();
 
   const [inputQuery, setInputQuery] = useState('');
@@ -170,6 +172,22 @@ How can I assist you today?`,
             description: p.notes || 'Added via Bahu AI Assistant',
             notes: p.notes || 'Added via Bahu AI Assistant',
           });
+          break;
+        }
+
+        case 'ADD_FUEL_SALE': {
+          const targetTank = tanks.find(t => t.id === p.tankId) || tanks.find(t => t.fuelType === (p.fuelType || 'Super Petrol')) || tanks[0];
+          if (targetTank) {
+            addFuelSale({
+              date: p.date || dateStr,
+              fuelType: (p.fuelType || targetTank.fuelType || 'Super Petrol') as any,
+              tankId: targetTank.id,
+              quantityLiters: Number(p.quantityLiters || p.liters) || 100,
+              sellingPricePerLiter: Number(p.sellingPrice) || undefined,
+              totalSaleAmount: amount || Number(p.totalSaleAmount) || 0,
+              notes: p.notes || 'Recorded via Bahu AI Assistant',
+            });
+          }
           break;
         }
 
@@ -355,6 +373,24 @@ How can I assist you today?`,
     const totalBankBalance = (bankAccounts || []).reduce((acc, curr) => acc + curr.currentBalance, 0);
     const cashInRegister = cashRegister?.cashBalance || 0;
 
+    const fuelByTypes = {
+      'Super Petrol': {
+        stockLiters: tanks.filter(t => t.fuelType === 'Super Petrol' || (t.fuelType as string) === 'Petrol').reduce((a, b) => a + b.currentFuel, 0),
+        deliveriesLiters: deliveries.filter(d => d.fuelType === 'Super Petrol' || (d.fuelType as string) === 'Petrol').reduce((a, b) => a + (b.totalLitersReceived || b.petrolLiters || 0), 0),
+        deliveriesCost: deliveries.filter(d => d.fuelType === 'Super Petrol' || (d.fuelType as string) === 'Petrol').reduce((a, b) => a + (b.totalPurchaseAmount || 0), 0),
+      },
+      'High-Speed Diesel (HSD)': {
+        stockLiters: tanks.filter(t => t.fuelType === 'High-Speed Diesel (HSD)' || (t.fuelType as string) === 'Diesel').reduce((a, b) => a + b.currentFuel, 0),
+        deliveriesLiters: deliveries.filter(d => d.fuelType === 'High-Speed Diesel (HSD)' || (d.fuelType as string) === 'Diesel').reduce((a, b) => a + (b.totalLitersReceived || b.dieselLiters || 0), 0),
+        deliveriesCost: deliveries.filter(d => d.fuelType === 'High-Speed Diesel (HSD)' || (d.fuelType as string) === 'Diesel').reduce((a, b) => a + (b.totalPurchaseAmount || 0), 0),
+      },
+      'Excellium High-Octane': {
+        stockLiters: tanks.filter(t => t.fuelType === 'Excellium High-Octane').reduce((a, b) => a + b.currentFuel, 0),
+        deliveriesLiters: deliveries.filter(d => d.fuelType === 'Excellium High-Octane').reduce((a, b) => a + (b.totalLitersReceived || 0), 0),
+        deliveriesCost: deliveries.filter(d => d.fuelType === 'Excellium High-Octane').reduce((a, b) => a + (b.totalPurchaseAmount || 0), 0),
+      }
+    };
+
     return {
       summary: {
         totalIncome,
@@ -363,6 +399,7 @@ How can I assist you today?`,
         cashInRegister,
         totalBankBalance,
       },
+      fuelBreakdownByFuelType: fuelByTypes,
       tanks: (tanks || []).map((t) => ({
         tankName: t.tankName,
         fuelType: t.fuelType,
@@ -371,6 +408,15 @@ How can I assist you today?`,
       })),
       deliveries: (deliveries || []).slice(-10),
       dailySalesEntries: (dailySalesEntries || []).slice(-15),
+      fuelSalesSummary: {
+        totalFuelSalesEntries: (fuelSales || []).length,
+        totalLitersSold: (fuelSales || []).reduce((a, b) => a + b.quantityLiters, 0),
+        totalFuelSalesRevenue: (fuelSales || []).reduce((a, b) => a + b.totalSaleAmount, 0),
+        superPetrolSoldLiters: (fuelSales || []).filter(s => s.fuelType === 'Super Petrol').reduce((a, b) => a + b.quantityLiters, 0),
+        hsdSoldLiters: (fuelSales || []).filter(s => s.fuelType === 'High-Speed Diesel (HSD)').reduce((a, b) => a + b.quantityLiters, 0),
+        highOctaneSoldLiters: (fuelSales || []).filter(s => s.fuelType === 'Excellium High-Octane').reduce((a, b) => a + b.quantityLiters, 0),
+      },
+      recentFuelSales: (fuelSales || []).slice(-15),
       lubricants: (lubricants || []).map((l) => ({
         productName: l.productName,
         category: l.category,

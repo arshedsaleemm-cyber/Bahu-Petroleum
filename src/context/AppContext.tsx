@@ -52,6 +52,7 @@ import {
   RestaurantPurchase,
   RestaurantDeposit,
   DailySalesEntry,
+  FuelSale,
 } from '../types';
 import {
   initialUsers,
@@ -85,6 +86,7 @@ import {
   initialRestaurantPurchases,
   initialRestaurantDeposits,
   initialDailySalesEntries,
+  initialFuelSales,
 } from '../data/initialData';
 
 interface AppContextType {
@@ -143,6 +145,12 @@ interface AppContextType {
   addDailySalesEntry: (data: Omit<DailySalesEntry, 'id' | 'createdAt' | 'createdBy'>) => void;
   updateDailySalesEntry: (id: string, updated: Partial<DailySalesEntry>) => void;
   deleteDailySalesEntry: (id: string) => void;
+
+  // Fuel Sales Collection
+  fuelSales: FuelSale[];
+  addFuelSale: (data: Omit<FuelSale, 'id' | 'createdAt' | 'createdBy'>) => { success: boolean; message?: string };
+  updateFuelSale: (id: string, updated: Partial<FuelSale>) => { success: boolean; message?: string };
+  deleteFuelSale: (id: string) => void;
 
   // Permissions helpers
   isAdmin: boolean;
@@ -337,6 +345,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [restaurantDeposits, setRestaurantDeposits] = useState<RestaurantDeposit[]>(() => loadLocal('restaurantDeposits', initialRestaurantDeposits) || []);
 
   const [dailySalesEntries, setDailySalesEntries] = useState<DailySalesEntry[]>(() => loadLocal('dailySalesEntries', initialDailySalesEntries) || []);
+  const [fuelSales, setFuelSales] = useState<FuelSale[]>(() => loadLocal('fuelSales', initialFuelSales) || []);
 
   function saveLocal<T>(key: string, value: T) {
     try {
@@ -407,6 +416,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       restaurantPurchases: initialRestaurantPurchases,
       restaurantDeposits: initialRestaurantDeposits,
       dailySalesEntries: initialDailySalesEntries,
+      fuelSales: initialFuelSales,
     };
 
     const singletonDataMap = {
@@ -465,6 +475,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     unsubs.push(subscribeToCollection<RestaurantDeposit>('restaurantDeposits', wrapSetter(setRestaurantDeposits)));
 
     unsubs.push(subscribeToCollection<DailySalesEntry>('dailySalesEntries', wrapSetter(setDailySalesEntries)));
+    unsubs.push(subscribeToCollection<FuelSale>('fuelSales', wrapSetter(setFuelSales)));
 
     return () => {
       unsubs.forEach(unsub => unsub());
@@ -503,6 +514,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => saveLocal('restaurantSuppliers', restaurantSuppliers), [restaurantSuppliers]);
   useEffect(() => saveLocal('restaurantInventory', restaurantInventory), [restaurantInventory]);
   useEffect(() => saveLocal('dailySalesEntries', dailySalesEntries), [dailySalesEntries]);
+  useEffect(() => saveLocal('fuelSales', fuelSales), [fuelSales]);
   useEffect(() => saveLocal('restaurantPurchases', restaurantPurchases), [restaurantPurchases]);
   useEffect(() => saveLocal('restaurantDeposits', restaurantDeposits), [restaurantDeposits]);
 
@@ -857,6 +869,152 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDeliveries(prev => prev.filter(d => d.id !== id));
     syncDeleteDoc('deliveries', id);
     logAuditDelete('Fuel Delivery', `${del?.fuelType || 'Fuel'} (Invoice #${del?.invoiceNo || id})`);
+  };
+
+  // Fuel Sales Action Handlers
+  const addFuelSale = (data: Omit<FuelSale, 'id' | 'createdAt' | 'createdBy'>): { success: boolean; message?: string } => {
+    const targetTank = tanks.find(t => t.id === data.tankId);
+    if (!targetTank) {
+      return { success: false, message: 'Selected tank was not found in the system.' };
+    }
+
+    // Check stock availability
+    if (data.quantityLiters > targetTank.currentFuel) {
+      return {
+        success: false,
+        message: `Sale quantity (${data.quantityLiters.toLocaleString()} L) exceeds available fuel stock in ${targetTank.tankName} (${targetTank.currentFuel.toLocaleString()} L).`,
+      };
+    }
+
+    const calculatedTotal = data.sellingPricePerLiter
+      ? Math.round(data.quantityLiters * data.sellingPricePerLiter)
+      : data.totalSaleAmount;
+
+    const newSale: FuelSale = {
+      ...data,
+      id: `sale-${Date.now()}`,
+      tankName: targetTank.tankName,
+      totalSaleAmount: calculatedTotal,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser?.name || 'System',
+    };
+
+    setFuelSales(prev => [newSale, ...prev]);
+    syncSaveDoc('fuelSales', newSale);
+
+    // Subtract sold litres from target tank
+    setTanks(prevTanks =>
+      prevTanks.map(t => {
+        if (t.id === data.tankId) {
+          const newRemaining = Math.max(0, t.currentFuel - data.quantityLiters);
+          const updatedTank = {
+            ...t,
+            currentFuel: newRemaining,
+            closingStock: newRemaining,
+          };
+          syncSaveDoc('tanks', updatedTank);
+          return updatedTank;
+        }
+        return t;
+      })
+    );
+
+    return { success: true };
+  };
+
+  const updateFuelSale = (id: string, updatedData: Partial<FuelSale>): { success: boolean; message?: string } => {
+    if (!canEdit) {
+      return { success: false, message: 'Permission denied. Admin access required.' };
+    }
+
+    const oldSale = fuelSales.find(s => s.id === id);
+    if (!oldSale) {
+      return { success: false, message: 'Fuel sale record not found.' };
+    }
+
+    const targetTankId = updatedData.tankId || oldSale.tankId;
+    const targetTank = tanks.find(t => t.id === targetTankId);
+    if (!targetTank) {
+      return { success: false, message: 'Selected target tank not found.' };
+    }
+
+    const newQty = updatedData.quantityLiters ?? oldSale.quantityLiters;
+    const oldQtyInTank = oldSale.tankId === targetTankId ? oldSale.quantityLiters : 0;
+    const effectiveStock = targetTank.currentFuel + oldQtyInTank;
+
+    if (newQty > effectiveStock) {
+      return {
+        success: false,
+        message: `Updated sale quantity (${newQty.toLocaleString()} L) exceeds available stock (${effectiveStock.toLocaleString()} L).`,
+      };
+    }
+
+    // Update tanks (restore old sale qty if tank changed or adjust net qty)
+    setTanks(prevTanks =>
+      prevTanks.map(t => {
+        if (t.id === oldSale.tankId && oldSale.tankId !== targetTankId) {
+          const restored = t.currentFuel + oldSale.quantityLiters;
+          const updatedTank = { ...t, currentFuel: restored, closingStock: restored };
+          syncSaveDoc('tanks', updatedTank);
+          return updatedTank;
+        }
+        if (t.id === targetTankId) {
+          const baseFuel = oldSale.tankId === targetTankId ? t.currentFuel + oldSale.quantityLiters : t.currentFuel;
+          const newFuel = Math.max(0, baseFuel - newQty);
+          const updatedTank = { ...t, currentFuel: newFuel, closingStock: newFuel };
+          syncSaveDoc('tanks', updatedTank);
+          return updatedTank;
+        }
+        return t;
+      })
+    );
+
+    setFuelSales(prev =>
+      prev.map(s => {
+        if (s.id === id) {
+          const calcTotal = updatedData.sellingPricePerLiter
+            ? Math.round(newQty * updatedData.sellingPricePerLiter)
+            : updatedData.totalSaleAmount ?? s.totalSaleAmount;
+
+          const updated: FuelSale = {
+            ...s,
+            ...updatedData,
+            tankName: targetTank.tankName,
+            totalSaleAmount: calcTotal,
+          };
+          syncSaveDoc('fuelSales', updated);
+          return updated;
+        }
+        return s;
+      })
+    );
+
+    return { success: true };
+  };
+
+  const deleteFuelSale = (id: string) => {
+    if (!canDelete) return;
+    const sale = fuelSales.find(s => s.id === id);
+    if (!sale) return;
+
+    // Restore stock back to tank
+    if (sale.tankId) {
+      setTanks(prevTanks =>
+        prevTanks.map(t => {
+          if (t.id === sale.tankId) {
+            const restoredFuel = t.currentFuel + sale.quantityLiters;
+            const updatedTank = { ...t, currentFuel: restoredFuel, closingStock: restoredFuel };
+            syncSaveDoc('tanks', updatedTank);
+            return updatedTank;
+          }
+          return t;
+        })
+      );
+    }
+
+    setFuelSales(prev => prev.filter(s => s.id !== id));
+    syncDeleteDoc('fuelSales', id);
+    logAuditDelete('Fuel Sale Entry', `${sale.fuelType} - ${sale.quantityLiters} Litres (${sale.date})`);
   };
 
   const addTank = (data: Omit<Tank, 'id'>) => {
@@ -1828,6 +1986,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addDailySalesEntry,
         updateDailySalesEntry,
         deleteDailySalesEntry,
+        fuelSales,
+        addFuelSale,
+        updateFuelSale,
+        deleteFuelSale,
         isAdmin,
         canEdit,
         canDelete,

@@ -12,15 +12,29 @@ export const TankVisualizer: React.FC<TankVisualizerProps> = ({ tank, onEdit }) 
   const percentage = Math.min(100, Math.max(0, Math.round((tank.currentFuel / tank.capacity) * 100)));
   const isLow = tank.currentFuel <= tank.lowStockThreshold;
 
-  const isPetrol = tank.fuelType === 'Petrol';
-  // Petrol color gradient: Red/Orange accent; Diesel: Deep Blue/Amber accent
-  const liquidBg = isPetrol
-    ? isLow
-      ? 'from-red-600 to-rose-700'
-      : 'from-red-500 to-amber-600'
-    : isLow
-    ? 'from-amber-600 to-red-700'
-    : 'from-blue-600 to-indigo-700';
+  const fuelTypeLower = (tank.fuelType || '').toLowerCase();
+
+  const isSuperPetrol = fuelTypeLower.includes('petrol') || fuelTypeLower.includes('super');
+  const isDiesel = fuelTypeLower.includes('diesel') || fuelTypeLower.includes('hsd');
+  const isExcellium = fuelTypeLower.includes('excellium') || fuelTypeLower.includes('octane');
+
+  let liquidBg = 'from-blue-600 to-indigo-700';
+  let badgeStyle = 'bg-blue-100 text-blue-800';
+  let iconColor = 'text-blue-600';
+
+  if (isExcellium) {
+    liquidBg = isLow ? 'from-amber-600 to-red-700' : 'from-emerald-500 to-teal-700';
+    badgeStyle = 'bg-emerald-100 text-emerald-800';
+    iconColor = 'text-emerald-600';
+  } else if (isSuperPetrol) {
+    liquidBg = isLow ? 'from-red-600 to-rose-700' : 'from-red-500 to-amber-600';
+    badgeStyle = 'bg-red-100 text-red-700';
+    iconColor = 'text-red-600';
+  } else if (isDiesel) {
+    liquidBg = isLow ? 'from-amber-600 to-red-700' : 'from-blue-600 to-indigo-800';
+    badgeStyle = 'bg-blue-100 text-blue-800';
+    iconColor = 'text-blue-600';
+  }
 
   return (
     <div
@@ -33,13 +47,11 @@ export const TankVisualizer: React.FC<TankVisualizerProps> = ({ tank, onEdit }) 
       <div className="flex items-start justify-between gap-2 mb-3">
         <div>
           <div className="flex items-center gap-2">
-            <Container className={`w-4 h-4 ${isPetrol ? 'text-red-600' : 'text-blue-600'}`} />
+            <Container className={`w-4 h-4 ${iconColor}`} />
             <h4 className="font-bold text-slate-900 text-sm">{tank.tankName}</h4>
           </div>
           <span
-            className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-              isPetrol ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-800'
-            }`}
+            className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${badgeStyle}`}
           >
             {tank.fuelType} Tank
           </span>

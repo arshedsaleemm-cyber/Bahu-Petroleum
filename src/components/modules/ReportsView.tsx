@@ -173,7 +173,7 @@ export const ReportsView: React.FC = () => {
             {reportType === 'DELIVERIES' && (
               <div className="space-y-2">
                 {deliveries.map(d => {
-                  const rate = d.fuelRate || (d.fuelType === 'Petrol' ? d.purchaseRatePetrol : d.purchaseRateDiesel) || (d.totalLitersReceived ? d.totalPurchaseAmount / d.totalLitersReceived : 0);
+                  const rate = d.fuelRate || ((d.fuelType as string) === 'Petrol' ? d.purchaseRatePetrol : d.purchaseRateDiesel) || (d.totalLitersReceived ? d.totalPurchaseAmount / d.totalLitersReceived : 0);
                   return (
                     <div key={d.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
                       <div>

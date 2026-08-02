@@ -57,10 +57,18 @@ export const DashboardView: React.FC = () => {
     rentalAgreements,
     notifications,
     dailySalesEntries,
+    fuelSales,
     setCurrentView,
   } = useApp();
 
   const todayIso = new Date().toISOString().slice(0, 10);
+  const currentMonthIso = todayIso.slice(0, 7);
+  const currentYearIso = todayIso.slice(0, 4);
+
+  // Fuel Sales Litres Metrics
+  const todayFuelSoldLiters = (fuelSales || []).filter(s => s.date === todayIso).reduce((a, b) => a + b.quantityLiters, 0);
+  const monthlyFuelSoldLiters = (fuelSales || []).filter(s => s.date.startsWith(currentMonthIso)).reduce((a, b) => a + b.quantityLiters, 0);
+  const yearlyFuelSoldLiters = (fuelSales || []).filter(s => s.date.startsWith(currentYearIso)).reduce((a, b) => a + b.quantityLiters, 0);
   const todayDailySalesTotal = (dailySalesEntries || [])
     .filter(e => e.date === todayIso)
     .reduce((a, b) => a + (b.totalSales || 0), 0);
@@ -69,8 +77,8 @@ export const DashboardView: React.FC = () => {
   const todaySalesAmount = todayDailySalesTotal;
   const monthlySalesAmount = todaySalesAmount * 28; // Estimated monthly run rate
 
-  const totalPetrolStock = tanks.filter(t => t.fuelType === 'Petrol').reduce((a, b) => a + b.currentFuel, 0);
-  const totalDieselStock = tanks.filter(t => t.fuelType === 'Diesel').reduce((a, b) => a + b.currentFuel, 0);
+  const totalPetrolStock = tanks.filter(t => (t.fuelType as string) === 'Petrol' || t.fuelType === 'Super Petrol').reduce((a, b) => a + b.currentFuel, 0);
+  const totalDieselStock = tanks.filter(t => (t.fuelType as string) === 'Diesel' || t.fuelType === 'High-Speed Diesel (HSD)').reduce((a, b) => a + b.currentFuel, 0);
 
   const todayFuelReceived = deliveries.reduce((acc, curr) => acc + curr.totalLitersReceived, 0);
 
@@ -189,6 +197,25 @@ export const DashboardView: React.FC = () => {
 
       {/* Key Financial Metric KPI Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Today's Fuel Sales (Litres) */}
+        <div
+          onClick={() => setCurrentView('fuel_sales')}
+          className="bg-gradient-to-br from-red-900 to-slate-900 text-white rounded-2xl p-4 shadow-sm hover:border-red-500 border border-red-800 transition-all cursor-pointer group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-red-200 uppercase tracking-wider">Fuel Sold (Litres)</span>
+            <div className="p-2 rounded-xl bg-red-800/80 text-red-200 group-hover:scale-110 transition-transform">
+              <Fuel className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-lg sm:text-2xl font-black text-white mt-2">
+            {todayFuelSoldLiters.toLocaleString()} <span className="text-xs font-bold text-red-300">L Today</span>
+          </p>
+          <p className="text-[11px] text-red-300 font-semibold mt-1">
+            Month: {monthlyFuelSoldLiters.toLocaleString()} L • Year: {yearlyFuelSoldLiters.toLocaleString()} L
+          </p>
+        </div>
+
         {/* Today's Sales */}
         <div
           onClick={() => setCurrentView('daily_petrol_cash')}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tank } from '../../types';
-import { Container, AlertTriangle } from 'lucide-react';
+import { Container, AlertTriangle, ArrowDownRight, ArrowUpRight, Clock, RefreshCw } from 'lucide-react';
 import { formatLiters } from '../../utils/formatters';
 
 interface TankVisualizerProps {
@@ -36,6 +36,15 @@ export const TankVisualizer: React.FC<TankVisualizerProps> = ({ tank, onEdit }) 
     iconColor = 'text-blue-600';
   }
 
+  const formattedLastUpdated = tank.lastUpdatedTime
+    ? new Date(tank.lastUpdatedTime).toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'Live';
+
   return (
     <div
       onClick={() => onEdit && onEdit(tank)}
@@ -50,11 +59,16 @@ export const TankVisualizer: React.FC<TankVisualizerProps> = ({ tank, onEdit }) 
             <Container className={`w-4 h-4 ${iconColor}`} />
             <h4 className="font-bold text-slate-900 text-sm">{tank.tankName}</h4>
           </div>
-          <span
-            className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${badgeStyle}`}
-          >
-            {tank.fuelType} Tank
-          </span>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span
+              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${badgeStyle}`}
+            >
+              {tank.fuelType}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <RefreshCw className="w-2.5 h-2.5 animate-spin text-emerald-600" /> Live Synced
+            </span>
+          </div>
         </div>
 
         {isLow && (
@@ -75,33 +89,57 @@ export const TankVisualizer: React.FC<TankVisualizerProps> = ({ tank, onEdit }) 
           {/* Surface wave shimmer line */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-white/40 animate-pulse" />
           {percentage > 25 && (
-            <span className="text-white font-extrabold text-xs drop-shadow">{percentage}%</span>
+            <span className="text-white font-extrabold text-xs drop-shadow">{percentage}% Filled</span>
           )}
         </div>
 
         {percentage <= 25 && (
           <div className="absolute inset-0 flex items-center justify-center text-slate-700 font-extrabold text-xs">
-            {percentage}%
+            {percentage}% Filled
           </div>
         )}
       </div>
 
-      {/* Stats Breakdown */}
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-          <p className="text-slate-500 text-[10px] uppercase font-bold">Current Level</p>
-          <p className="font-extrabold text-slate-900 text-sm mt-0.5">{formatLiters(tank.currentFuel)}</p>
+      {/* 4-Grid Stats Breakdown: Current Stock, Capacity, Delivered, Sold */}
+      <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+        <div className="bg-slate-900 text-white p-2.5 rounded-xl">
+          <p className="text-slate-300 text-[10px] uppercase font-bold">Current Stock (Live)</p>
+          <p className="font-black text-white text-base mt-0.5">{formatLiters(tank.currentFuel)}</p>
         </div>
-        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-          <p className="text-slate-500 text-[10px] uppercase font-bold">Total Capacity</p>
-          <p className="font-semibold text-slate-700 text-sm mt-0.5">{formatLiters(tank.capacity)}</p>
+        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+          <p className="text-slate-500 text-[10px] uppercase font-bold">Opening Stock</p>
+          <p className="font-bold text-slate-800 text-sm mt-0.5">{formatLiters(tank.openingStock || 0)}</p>
+        </div>
+        <div className="bg-emerald-50/80 p-2 rounded-xl border border-emerald-100 text-emerald-900">
+          <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-700">
+            <ArrowDownRight className="w-3 h-3 text-emerald-600" />
+            <span>Total Delivered</span>
+          </div>
+          <p className="font-extrabold text-emerald-800 text-xs mt-0.5">
+            +{formatLiters(tank.totalFuelDelivered || 0)}
+          </p>
+        </div>
+        <div className="bg-blue-50/80 p-2 rounded-xl border border-blue-100 text-blue-900">
+          <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-blue-700">
+            <ArrowUpRight className="w-3 h-3 text-blue-600" />
+            <span>Total Sold</span>
+          </div>
+          <p className="font-extrabold text-blue-800 text-xs mt-0.5">
+            -{formatLiters(tank.totalFuelSold || 0)}
+          </p>
         </div>
       </div>
 
-      {/* Remaining Capacity */}
-      <div className="mt-2 text-[11px] text-slate-500 flex justify-between font-medium">
-        <span>Ullage (Remaining Space):</span>
-        <span className="font-bold text-slate-800">{formatLiters(tank.capacity - tank.currentFuel)}</span>
+      {/* Bottom Footer Stats: Remaining Free Space & Last Updated */}
+      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+        <div>
+          <span>Ullage (Free Space): </span>
+          <span className="font-bold text-slate-800">{formatLiters(tank.capacity - tank.currentFuel)}</span>
+        </div>
+        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold">
+          <Clock className="w-3 h-3" />
+          <span>{formattedLastUpdated}</span>
+        </div>
       </div>
     </div>
   );

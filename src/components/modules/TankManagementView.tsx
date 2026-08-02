@@ -5,8 +5,20 @@ import { TankVisualizer } from '../common/TankVisualizer';
 import { formatLiters } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
-import { PDFExportButton } from '../common/PDFExportButton';
-import { Container, Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
+import {
+  Container,
+  Plus,
+  Edit2,
+  Trash2,
+  X,
+  RefreshCw,
+  Gauge,
+  ArrowDownRight,
+  ArrowUpRight,
+  Info,
+  CheckCircle2,
+  ShieldCheck,
+} from 'lucide-react';
 
 export const TankManagementView: React.FC = () => {
   const { tanks, addTank, updateTank, deleteTank, canDelete, canEdit } = useApp();
@@ -19,17 +31,22 @@ export const TankManagementView: React.FC = () => {
   const [tankName, setTankName] = useState('');
   const [fuelType, setFuelType] = useState<FuelType>('Super Petrol');
   const [capacity, setCapacity] = useState<number>(25000);
-  const [currentFuel, setCurrentFuel] = useState<number>(18000);
-  const [openingStock, setOpeningStock] = useState<number>(18000);
+  const [openingStock, setOpeningStock] = useState<number>(15000);
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(5000);
   const [notes, setNotes] = useState('');
+
+  // Overall Live Metrics across all tanks
+  const totalCapacity = tanks.reduce((acc, t) => acc + (t.capacity || 0), 0);
+  const totalLiveCurrentFuel = tanks.reduce((acc, t) => acc + (t.currentFuel || 0), 0);
+  const totalFuelDelivered = tanks.reduce((acc, t) => acc + (t.totalFuelDelivered || 0), 0);
+  const totalFuelSold = tanks.reduce((acc, t) => acc + (t.totalFuelSold || 0), 0);
+  const totalRemainingUllage = Math.max(0, totalCapacity - totalLiveCurrentFuel);
 
   const openAddModal = () => {
     setEditingTank(null);
     setTankName(`Tank ${tanks.length + 1} - Super Petrol`);
     setFuelType('Super Petrol');
     setCapacity(25000);
-    setCurrentFuel(15000);
     setOpeningStock(15000);
     setLowStockThreshold(5000);
     setNotes('');
@@ -41,8 +58,7 @@ export const TankManagementView: React.FC = () => {
     setTankName(tank.tankName);
     setFuelType(tank.fuelType);
     setCapacity(tank.capacity);
-    setCurrentFuel(tank.currentFuel);
-    setOpeningStock(tank.openingStock);
+    setOpeningStock(tank.openingStock || 0);
     setLowStockThreshold(tank.lowStockThreshold);
     setNotes(tank.notes || '');
     setIsModalOpen(true);
@@ -56,9 +72,9 @@ export const TankManagementView: React.FC = () => {
         tankName,
         fuelType,
         capacity,
-        currentFuel,
         openingStock,
-        closingStock: currentFuel,
+        currentFuel: openingStock, // Live recalculation engine overrides this automatically
+        closingStock: openingStock,
         lowStockThreshold,
         notes,
       });
@@ -67,9 +83,9 @@ export const TankManagementView: React.FC = () => {
         tankName,
         fuelType,
         capacity,
-        currentFuel,
         openingStock,
-        closingStock: currentFuel,
+        currentFuel: openingStock,
+        closingStock: openingStock,
         dailyUsage: 0,
         lowStockThreshold,
         notes,
@@ -89,10 +105,14 @@ export const TankManagementView: React.FC = () => {
             <div className="p-2 bg-blue-100 text-blue-800 rounded-xl">
               <Container className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-black text-slate-900">Tank Management</h2>
+            <h2 className="text-xl font-black text-slate-900">Automatic Tank Management</h2>
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 ml-2">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+              Live Automatic Sync Active
+            </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Configure unlimited underground fuel storage tanks and monitor live gauge heights.
+            Opening stock is entered once. Current tank levels recalculate automatically in real-time as Fuel Deliveries and Fuel Sales are recorded.
           </p>
         </div>
 
@@ -103,6 +123,76 @@ export const TankManagementView: React.FC = () => {
           >
             <Plus className="w-4 h-4" /> Add Underground Tank
           </button>
+        </div>
+      </div>
+
+      {/* Real-Time Dashboard Summary Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-sm border border-slate-800">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Live Current Stock</span>
+            <div className="p-1.5 rounded-lg bg-slate-800 text-emerald-400">
+              <Gauge className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-lg sm:text-2xl font-black text-white mt-2">{formatLiters(totalLiveCurrentFuel)}</p>
+          <p className="text-[11px] text-slate-400 font-semibold mt-1">
+            Total Capacity: {formatLiters(totalCapacity)}
+          </p>
+        </div>
+
+        <div className="bg-emerald-900 text-white rounded-2xl p-4 shadow-sm border border-emerald-800">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wider">Total Delivered</span>
+            <div className="p-1.5 rounded-lg bg-emerald-800 text-emerald-300">
+              <ArrowDownRight className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-lg sm:text-2xl font-black text-white mt-2">+{formatLiters(totalFuelDelivered)}</p>
+          <p className="text-[11px] text-emerald-200 font-semibold mt-1">
+            Added from Delivery Records
+          </p>
+        </div>
+
+        <div className="bg-blue-900 text-white rounded-2xl p-4 shadow-sm border border-blue-800">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-blue-200 uppercase tracking-wider">Total Fuel Sold</span>
+            <div className="p-1.5 rounded-lg bg-blue-800 text-blue-300">
+              <ArrowUpRight className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-lg sm:text-2xl font-black text-white mt-2">-{formatLiters(totalFuelSold)}</p>
+          <p className="text-[11px] text-blue-200 font-semibold mt-1">
+            Deducted from Sales Entries
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Free Tank Space</span>
+            <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600">
+              <Container className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-lg sm:text-2xl font-black text-slate-900 mt-2">{formatLiters(totalRemainingUllage)}</p>
+          <p className="text-[11px] text-slate-500 font-semibold mt-1">
+            Ullage Available
+          </p>
+        </div>
+
+        <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-4 shadow-sm border border-indigo-800 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-indigo-200 uppercase tracking-wider">Sync Integrity</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-emerald-300 flex items-center gap-1 mt-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> 100% Zero Mismatch
+            </p>
+            <p className="text-[10px] text-slate-300 mt-1">
+              Live Formula: Opening + Deliveries − Sales
+            </p>
+          </div>
         </div>
       </div>
 
@@ -221,16 +311,19 @@ export const TankManagementView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Current Stock (Liters)</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Opening Stock (Liters)
+                  </label>
                   <input
                     type="number"
-                    value={currentFuel}
-                    onChange={e => setCurrentFuel(Number(e.target.value))}
+                    value={openingStock}
+                    onChange={e => setOpeningStock(Number(e.target.value))}
                     required
                     min={0}
                     max={capacity}
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-blue-600"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1 font-medium">Entered once when tank is created.</p>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Low Stock Threshold (L)</label>
@@ -241,6 +334,18 @@ export const TankManagementView: React.FC = () => {
                     required
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-blue-600"
                   />
+                </div>
+              </div>
+
+              {/* Live Synchronization Info Badge */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-2.5 text-xs text-blue-900">
+                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-blue-950">Automatic Live Stock Synchronization</p>
+                  <p className="text-[11px] text-blue-800 mt-0.5">
+                    Current Tank Stock = Opening Stock ({openingStock.toLocaleString()} L) + Deliveries − Sales.
+                    You do not need to manually edit fuel levels again.
+                  </p>
                 </div>
               </div>
 

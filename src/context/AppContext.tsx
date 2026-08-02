@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import {
   testFirestoreConnection,
   auth,
@@ -828,26 +828,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setDeliveries(prev => [newDelivery, ...prev]);
     syncSaveDoc('deliveries', newDelivery);
-
-    // Update target tank current stock
-    if (data.tankId) {
-      setTanks(prevTanks =>
-        prevTanks.map(t => {
-          if (t.id === data.tankId) {
-            const added = data.totalLitersReceived;
-            const newFuel = t.currentFuel + added;
-            const updatedTank = {
-              ...t,
-              currentFuel: newFuel,
-              closingStock: newFuel,
-            };
-            syncSaveDoc('tanks', updatedTank);
-            return updatedTank;
-          }
-          return t;
-        })
-      );
-    }
   };
 
   const updateDelivery = (id: string, data: Partial<FuelDelivery>) => {
@@ -873,16 +853,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Fuel Sales Action Handlers
   const addFuelSale = (data: Omit<FuelSale, 'id' | 'createdAt' | 'createdBy'>): { success: boolean; message?: string } => {
-    const targetTank = tanks.find(t => t.id === data.tankId);
+    const targetTank = liveTanks.find(t => t.id === data.tankId) || liveTanks.find(t => t.fuelType === data.fuelType);
     if (!targetTank) {
       return { success: false, message: 'Selected tank was not found in the system.' };
     }
 
-    // Check stock availability
+    // Check stock availability against live tank stock
     if (data.quantityLiters > targetTank.currentFuel) {
       return {
         success: false,
-        message: `Sale quantity (${data.quantityLiters.toLocaleString()} L) exceeds available fuel stock in ${targetTank.tankName} (${targetTank.currentFuel.toLocaleString()} L).`,
+        message: `Sale quantity (${data.quantityLiters.toLocaleString()} L) exceeds live available stock in ${targetTank.tankName} (${targetTank.currentFuel.toLocaleString()} L).`,
       };
     }
 
@@ -893,6 +873,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newSale: FuelSale = {
       ...data,
       id: `sale-${Date.now()}`,
+      tankId: targetTank.id,
       tankName: targetTank.tankName,
       totalSaleAmount: calculatedTotal,
       createdAt: new Date().toISOString(),
@@ -901,23 +882,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setFuelSales(prev => [newSale, ...prev]);
     syncSaveDoc('fuelSales', newSale);
-
-    // Subtract sold litres from target tank
-    setTanks(prevTanks =>
-      prevTanks.map(t => {
-        if (t.id === data.tankId) {
-          const newRemaining = Math.max(0, t.currentFuel - data.quantityLiters);
-          const updatedTank = {
-            ...t,
-            currentFuel: newRemaining,
-            closingStock: newRemaining,
-          };
-          syncSaveDoc('tanks', updatedTank);
-          return updatedTank;
-        }
-        return t;
-      })
-    );
 
     return { success: true };
   };
@@ -933,41 +897,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const targetTankId = updatedData.tankId || oldSale.tankId;
-    const targetTank = tanks.find(t => t.id === targetTankId);
+    const targetTank = liveTanks.find(t => t.id === targetTankId) || liveTanks.find(t => t.fuelType === (updatedData.fuelType || oldSale.fuelType));
     if (!targetTank) {
       return { success: false, message: 'Selected target tank not found.' };
     }
 
     const newQty = updatedData.quantityLiters ?? oldSale.quantityLiters;
-    const oldQtyInTank = oldSale.tankId === targetTankId ? oldSale.quantityLiters : 0;
-    const effectiveStock = targetTank.currentFuel + oldQtyInTank;
+    const oldQtyInTank = oldSale.tankId === targetTank.id ? oldSale.quantityLiters : 0;
+    const effectiveAvailableStock = targetTank.currentFuel + oldQtyInTank;
 
-    if (newQty > effectiveStock) {
+    if (newQty > effectiveAvailableStock) {
       return {
         success: false,
-        message: `Updated sale quantity (${newQty.toLocaleString()} L) exceeds available stock (${effectiveStock.toLocaleString()} L).`,
+        message: `Updated sale quantity (${newQty.toLocaleString()} L) exceeds available live stock (${effectiveAvailableStock.toLocaleString()} L).`,
       };
     }
-
-    // Update tanks (restore old sale qty if tank changed or adjust net qty)
-    setTanks(prevTanks =>
-      prevTanks.map(t => {
-        if (t.id === oldSale.tankId && oldSale.tankId !== targetTankId) {
-          const restored = t.currentFuel + oldSale.quantityLiters;
-          const updatedTank = { ...t, currentFuel: restored, closingStock: restored };
-          syncSaveDoc('tanks', updatedTank);
-          return updatedTank;
-        }
-        if (t.id === targetTankId) {
-          const baseFuel = oldSale.tankId === targetTankId ? t.currentFuel + oldSale.quantityLiters : t.currentFuel;
-          const newFuel = Math.max(0, baseFuel - newQty);
-          const updatedTank = { ...t, currentFuel: newFuel, closingStock: newFuel };
-          syncSaveDoc('tanks', updatedTank);
-          return updatedTank;
-        }
-        return t;
-      })
-    );
 
     setFuelSales(prev =>
       prev.map(s => {
@@ -979,6 +923,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const updated: FuelSale = {
             ...s,
             ...updatedData,
+            tankId: targetTank.id,
             tankName: targetTank.tankName,
             totalSaleAmount: calcTotal,
           };
@@ -997,36 +942,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const sale = fuelSales.find(s => s.id === id);
     if (!sale) return;
 
-    // Restore stock back to tank
-    if (sale.tankId) {
-      setTanks(prevTanks =>
-        prevTanks.map(t => {
-          if (t.id === sale.tankId) {
-            const restoredFuel = t.currentFuel + sale.quantityLiters;
-            const updatedTank = { ...t, currentFuel: restoredFuel, closingStock: restoredFuel };
-            syncSaveDoc('tanks', updatedTank);
-            return updatedTank;
-          }
-          return t;
-        })
-      );
-    }
-
     setFuelSales(prev => prev.filter(s => s.id !== id));
     syncDeleteDoc('fuelSales', id);
     logAuditDelete('Fuel Sale Entry', `${sale.fuelType} - ${sale.quantityLiters} Litres (${sale.date})`);
   };
 
   const addTank = (data: Omit<Tank, 'id'>) => {
-    const newTank: Tank = { ...data, id: `tank-${Date.now()}` };
+    const newTank: Tank = {
+      ...data,
+      id: `tank-${Date.now()}`,
+      openingStock: Number(data.openingStock ?? data.currentFuel ?? 0),
+      currentFuel: Number(data.openingStock ?? data.currentFuel ?? 0),
+      closingStock: Number(data.openingStock ?? data.currentFuel ?? 0),
+      createdAt: new Date().toISOString(),
+      lastUpdatedTime: new Date().toISOString(),
+    };
     setTanks(prev => [...prev, newTank]);
     syncSaveDoc('tanks', newTank);
   };
 
   const updateTank = (tank: Tank) => {
     if (!canEdit) return;
-    setTanks(prev => prev.map(t => (t.id === tank.id ? tank : t)));
-    syncSaveDoc('tanks', tank);
+    const updatedTank = {
+      ...tank,
+      openingStock: Number(tank.openingStock ?? tank.currentFuel ?? 0),
+      lastUpdatedTime: new Date().toISOString(),
+    };
+    setTanks(prev => prev.map(t => (t.id === tank.id ? updatedTank : t)));
+    syncSaveDoc('tanks', updatedTank);
   };
 
   const deleteTank = (id: string) => {
@@ -1936,6 +1879,79 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
   };
 
+  // Live Tank Stock Synchronization Calculation
+  // Ground Truth: Current Tank Stock = Opening Stock + Total Fuel Delivered - Total Fuel Sold
+  const liveTanks = useMemo(() => {
+    return tanks.map(tank => {
+      const openingStock = Number(tank.openingStock ?? tank.currentFuel ?? 0);
+
+      // Total fuel delivered to this tank
+      const totalFuelDelivered = deliveries.reduce((sum, d) => {
+        const matchesTankId = d.tankId === tank.id;
+        const matchesFuelType = !d.tankId && (
+          d.fuelType === tank.fuelType ||
+          ((d.fuelType as string) === 'Petrol' && tank.fuelType === 'Super Petrol') ||
+          ((d.fuelType as string) === 'Diesel' && tank.fuelType === 'High-Speed Diesel (HSD)')
+        );
+        if (matchesTankId || matchesFuelType) {
+          return sum + (Number(d.totalLitersReceived) || 0);
+        }
+        return sum;
+      }, 0);
+
+      // Total fuel sold from this tank
+      const totalFuelSold = fuelSales.reduce((sum, s) => {
+        const matchesTankId = s.tankId === tank.id;
+        const matchesFuelType = !s.tankId && (
+          s.fuelType === tank.fuelType ||
+          ((s.fuelType as string) === 'Petrol' && tank.fuelType === 'Super Petrol') ||
+          ((s.fuelType as string) === 'Diesel' && tank.fuelType === 'High-Speed Diesel (HSD)')
+        );
+        if (matchesTankId || matchesFuelType) {
+          return sum + (Number(s.quantityLiters) || 0);
+        }
+        return sum;
+      }, 0);
+
+      const calculatedStock = Math.max(0, openingStock + totalFuelDelivered - totalFuelSold);
+
+      // Determine last updated time
+      let lastUpdated = tank.lastUpdatedTime || tank.createdAt || new Date().toISOString();
+
+      deliveries.forEach(d => {
+        if (d.tankId === tank.id || (!d.tankId && d.fuelType === tank.fuelType)) {
+          const dt = d.createdAt || d.deliveryDate;
+          if (dt && new Date(dt).getTime() > new Date(lastUpdated).getTime()) {
+            lastUpdated = dt;
+          }
+        }
+      });
+
+      fuelSales.forEach(s => {
+        if (s.tankId === tank.id || (!s.tankId && s.fuelType === tank.fuelType)) {
+          const st = s.createdAt || s.date;
+          if (st && new Date(st).getTime() > new Date(lastUpdated).getTime()) {
+            lastUpdated = st;
+          }
+        }
+      });
+
+      return {
+        ...tank,
+        openingStock,
+        totalFuelDelivered,
+        totalFuelSold,
+        currentFuel: calculatedStock,
+        closingStock: calculatedStock,
+        lastUpdatedTime: lastUpdated,
+      };
+    });
+  }, [tanks, deliveries, fuelSales]);
+
+  useEffect(() => {
+    saveLocal('tanks', liveTanks);
+  }, [liveTanks]);
+
   return (
     <AppContext.Provider
       value={{
@@ -1953,7 +1969,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsSearchOpen,
         searchQuery,
         setSearchQuery,
-        tanks,
+        tanks: liveTanks,
         deliveries,
         lubricants,
         workers,

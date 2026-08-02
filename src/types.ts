@@ -53,12 +53,16 @@ export interface Tank {
   name?: string;
   fuelType: FuelType;
   capacity: number; // in Liters
-  currentFuel: number; // in Liters
+  currentFuel: number; // in Liters (Live calculated: openingStock + totalFuelDelivered - totalFuelSold)
   openingStock: number;
   closingStock: number;
   dailyUsage: number;
   lowStockThreshold: number; // default 20%
   notes?: string;
+  totalFuelDelivered?: number;
+  totalFuelSold?: number;
+  lastUpdatedTime?: string;
+  createdAt?: string;
 }
 
 export interface LubricantProduct {

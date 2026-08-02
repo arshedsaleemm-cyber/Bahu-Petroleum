@@ -23,12 +23,15 @@ import {
   Info,
   ShieldAlert,
   ArrowDownRight,
+  Edit2,
+  DollarSign,
 } from 'lucide-react';
 
 export const FuelDeliveriesView: React.FC = () => {
-  const { deliveries, addDelivery, deleteDelivery, tanks, canDelete, currentUser } = useApp();
+  const { deliveries, addDelivery, updateDelivery, deleteDelivery, tanks, canEdit, canDelete, currentUser } = useApp();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingDelivery, setEditingDelivery] = useState<FuelDelivery | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('ALL');
   const [deliveryToDelete, setDeliveryToDelete] = useState<string | null>(null);
@@ -39,12 +42,11 @@ export const FuelDeliveriesView: React.FC = () => {
   const [fuelType, setFuelType] = useState<FuelType>('Petrol');
   const [petrolLiters, setPetrolLiters] = useState<number>(10000);
   const [dieselLiters, setDieselLiters] = useState<number>(0);
+  const [fuelRate, setFuelRate] = useState<number>(252.75);
   const [supplierName, setSupplierName] = useState('Pakistan State Oil (PSO)');
   const [invoiceNumber, setInvoiceNumber] = useState(`PSO-INV-${Math.floor(10000 + Math.random() * 90000)}`);
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [driverName, setDriverName] = useState('');
-  const [purchaseRatePetrol, setPurchaseRatePetrol] = useState<number>(265.5);
-  const [purchaseRateDiesel, setPurchaseRateDiesel] = useState<number>(278.0);
   const [tankId, setTankId] = useState<string>(tanks[0]?.id || '');
   const [receivedByWorker, setReceivedByWorker] = useState(currentUser?.name || '');
   const [notes, setNotes] = useState('');
@@ -58,19 +60,59 @@ export const FuelDeliveriesView: React.FC = () => {
   const shortageDip = dipDifference < 0 ? dipDifference : 0; // Only negative values represent shortage
   const estimatedShortageLiters = Math.abs(shortageDip) * 50; // Approx 50L per dip unit
 
-  const totalReceived = fuelType === 'Petrol' ? petrolLiters : fuelType === 'Diesel' ? dieselLiters : petrolLiters + dieselLiters;
-  const totalPurchaseAmount =
-    fuelType === 'Petrol'
-      ? petrolLiters * purchaseRatePetrol
-      : fuelType === 'Diesel'
-      ? dieselLiters * purchaseRateDiesel
-      : petrolLiters * purchaseRatePetrol + dieselLiters * purchaseRateDiesel;
+  const quantity = fuelType === 'Petrol' ? petrolLiters : fuelType === 'Diesel' ? dieselLiters : petrolLiters + dieselLiters;
+  const totalPurchaseAmount = quantity * fuelRate;
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const openAddModal = () => {
+    setEditingDelivery(null);
+    setDeliveryDate(new Date().toISOString().slice(0, 10));
+    setDeliveryTime('11:00 AM');
+    setFuelType('Petrol');
+    setPetrolLiters(10000);
+    setDieselLiters(0);
+    setFuelRate(252.75);
+    setSupplierName('Pakistan State Oil (PSO)');
+    setInvoiceNumber(`PSO-INV-${Math.floor(10000 + Math.random() * 90000)}`);
+    setVehicleNumber('');
+    setDriverName('');
+    setTankId(tanks[0]?.id || '');
+    setExpectedDip(174);
+    setActualDip(174);
+    setNotes('');
+    setIsAddModalOpen(true);
+  };
+
+  const openEditModal = (del: FuelDelivery) => {
+    setEditingDelivery(del);
+    setDeliveryDate(del.deliveryDate || new Date().toISOString().slice(0, 10));
+    setDeliveryTime(del.deliveryTime || '11:00 AM');
+    setFuelType(del.fuelType || 'Petrol');
+    const qty = del.totalLitersReceived || 10000;
+    if (del.fuelType === 'Diesel') {
+      setDieselLiters(qty);
+      setPetrolLiters(0);
+    } else {
+      setPetrolLiters(qty);
+      setDieselLiters(0);
+    }
+    const rate = del.fuelRate || (del.fuelType === 'Petrol' ? del.purchaseRatePetrol : del.purchaseRateDiesel) || (del.totalLitersReceived ? del.totalPurchaseAmount / del.totalLitersReceived : 252.75);
+    setFuelRate(rate);
+    setSupplierName(del.supplierName || '');
+    setInvoiceNumber(del.invoiceNumber || '');
+    setVehicleNumber(del.vehicleNumber || '');
+    setDriverName(del.driverName || '');
+    setTankId(del.tankId || tanks[0]?.id || '');
+    setExpectedDip(del.expectedDip ?? 174);
+    setActualDip(del.actualDip ?? 174);
+    setNotes(del.notes || '');
+    setIsAddModalOpen(true);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const selectedTank = tanks.find(t => t.id === tankId);
 
-    addDelivery({
+    const deliveryData = {
       deliveryDate,
       deliveryTime,
       fuelType,
@@ -80,9 +122,10 @@ export const FuelDeliveriesView: React.FC = () => {
       invoiceNumber,
       vehicleNumber,
       driverName,
-      totalLitersReceived: totalReceived,
-      purchaseRatePetrol: fuelType === 'Diesel' ? 0 : purchaseRatePetrol,
-      purchaseRateDiesel: fuelType === 'Petrol' ? 0 : purchaseRateDiesel,
+      totalLitersReceived: quantity,
+      fuelRate,
+      purchaseRatePetrol: fuelType === 'Diesel' ? 0 : fuelRate,
+      purchaseRateDiesel: fuelType === 'Petrol' ? 0 : fuelRate,
       totalPurchaseAmount,
       tankId,
       tankName: selectedTank?.tankName || 'Main Tank',
@@ -92,10 +135,17 @@ export const FuelDeliveriesView: React.FC = () => {
       shortageDip,
       shortageLiters: estimatedShortageLiters,
       receivedByWorker,
-      adminApprovalStatus: shortageDip < 0 ? 'Pending' : 'Approved',
+      adminApprovalStatus: (shortageDip < 0 ? 'Pending' : 'Approved') as 'Pending' | 'Approved' | 'Rejected',
       notes,
-    });
+    };
+
+    if (editingDelivery) {
+      updateDelivery(editingDelivery.id, deliveryData);
+    } else {
+      addDelivery(deliveryData);
+    }
     setIsAddModalOpen(false);
+    setEditingDelivery(null);
   };
 
   // Filtered Deliveries
@@ -113,18 +163,22 @@ export const FuelDeliveriesView: React.FC = () => {
   const totalShortagesCount = deliveries.filter(d => (d.shortageDip || 0) < 0).length;
 
   const handleExportPDF = () => {
-    const headers = ['Date', 'Supplier', 'Invoice', 'Fuel Type', 'Quantity', 'Expected Dip', 'Actual Dip', 'Shortage', 'Total Cost'];
-    const rows = filtered.map(d => [
-      d.deliveryDate,
-      d.supplierName,
-      d.invoiceNumber,
-      d.fuelType,
-      `${d.totalLitersReceived} L`,
-      `${d.expectedDip ?? '-'}`,
-      `${d.actualDip ?? '-'}`,
-      d.shortageDip && d.shortageDip < 0 ? `${d.shortageDip} Dip (${d.shortageLiters} L)` : 'No Shortage',
-      `Rs.${d.totalPurchaseAmount}`,
-    ]);
+    const headers = ['Date', 'Supplier', 'Invoice', 'Fuel Type', 'Quantity', 'Fuel Rate', 'Expected Dip', 'Actual Dip', 'Shortage', 'Total Cost'];
+    const rows = filtered.map(d => {
+      const rate = d.fuelRate || (d.fuelType === 'Petrol' ? d.purchaseRatePetrol : d.purchaseRateDiesel) || (d.totalLitersReceived ? d.totalPurchaseAmount / d.totalLitersReceived : 0);
+      return [
+        d.deliveryDate,
+        d.supplierName,
+        d.invoiceNumber,
+        d.fuelType,
+        `${d.totalLitersReceived} L`,
+        `PKR ${rate.toFixed(2)}/L`,
+        `${d.expectedDip ?? '-'}`,
+        `${d.actualDip ?? '-'}`,
+        d.shortageDip && d.shortageDip < 0 ? `${d.shortageDip} Dip (${d.shortageLiters} L)` : 'No Shortage',
+        `Rs.${d.totalPurchaseAmount}`,
+      ];
+    });
     exportToPDF('Bahu Petroleum - Fuel Delivery Verification Audit Report', headers, rows, 'Fuel_Deliveries_Shortage_Report');
   };
 
@@ -143,10 +197,10 @@ export const FuelDeliveriesView: React.FC = () => {
             <div className="p-2 bg-red-100 text-red-600 rounded-xl">
               <Truck className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-black text-slate-900">Fuel Delivery Verification & Shortage Audit</h2>
+            <h2 className="text-xl font-black text-slate-900">Fuel Delivery & Inventory Management</h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Log fuel shipments with mandatory Expected vs. Actual Dip readings & auto-calculated shortages.
+            Record incoming fuel deliveries with automatic Total Cost calculations based on Fuel Rate (Price Per Litre).
           </p>
         </div>
 
@@ -158,10 +212,10 @@ export const FuelDeliveriesView: React.FC = () => {
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel
           </button>
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={openAddModal}
             className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Verify & Log Delivery
+            <Plus className="w-4 h-4" /> Record Fuel Delivery
           </button>
         </div>
       </div>
@@ -233,12 +287,13 @@ export const FuelDeliveriesView: React.FC = () => {
             <Truck className="w-12 h-12 mx-auto stroke-1 text-slate-300" />
             <p className="font-bold text-slate-700 text-base">No Fuel Deliveries Recorded Yet</p>
             <p className="text-xs text-slate-400">
-              Click <span className="font-bold text-red-600">"Verify & Log Delivery"</span> above to log your first shipment with Dip measurement.
+              Click <span className="font-bold text-red-600">"Record Fuel Delivery"</span> above to log your first shipment.
             </p>
           </div>
         ) : (
           filtered.map(del => {
             const hasShortage = (del.shortageDip || 0) < 0;
+            const rate = del.fuelRate || (del.fuelType === 'Petrol' ? del.purchaseRatePetrol : del.purchaseRateDiesel) || (del.totalLitersReceived ? del.totalPurchaseAmount / del.totalLitersReceived : 0);
 
             return (
               <div
@@ -256,6 +311,11 @@ export const FuelDeliveriesView: React.FC = () => {
                     <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                       Invoice: {del.invoiceNumber}
                     </span>
+                    {del.tankName && (
+                      <span className="text-xs font-semibold text-slate-600 bg-amber-100 px-2 py-0.5 rounded">
+                        Tank: {del.tankName}
+                      </span>
+                    )}
                     {hasShortage ? (
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-700 flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" /> SHORTAGE DETECTED ({del.shortageDip} Dip)
@@ -267,14 +327,18 @@ export const FuelDeliveriesView: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <div>
                       <p className="text-[10px] text-slate-400 font-bold uppercase">Date & Time</p>
                       <p className="font-bold text-slate-800">{del.deliveryDate} ({del.deliveryTime})</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase">Volume Delivered</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Volume Received</p>
                       <p className="font-extrabold text-slate-900">{formatLiters(del.totalLitersReceived)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Fuel Rate</p>
+                      <p className="font-extrabold text-blue-700">PKR {rate.toFixed(2)}/L</p>
                     </div>
                     <div>
                       <p className="text-[10px] text-slate-400 font-bold uppercase">Expected Dip</p>
@@ -301,15 +365,24 @@ export const FuelDeliveriesView: React.FC = () => {
                     <p className="text-lg font-black text-red-600">{formatCurrency(del.totalPurchaseAmount)}</p>
                   </div>
 
-                  {canDelete && (
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={() => setDeliveryToDelete(del.id)}
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-slate-500 transition-all cursor-pointer"
-                      title="Delete Delivery Log"
+                      onClick={() => openEditModal(del)}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-amber-600 hover:text-white text-slate-500 transition-all cursor-pointer"
+                      title="Edit Delivery Log"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Edit2 className="w-4 h-4" />
                     </button>
-                  )}
+                    {canDelete && (
+                      <button
+                        onClick={() => setDeliveryToDelete(del.id)}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-slate-500 transition-all cursor-pointer"
+                        title="Delete Delivery Log"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -317,41 +390,58 @@ export const FuelDeliveriesView: React.FC = () => {
         )}
       </div>
 
-      {/* Add / Verify Delivery Modal */}
+      {/* Add / Edit Delivery Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95">
             <div className="bg-blue-900 p-5 text-white flex items-center justify-between">
               <div>
-                <h3 className="font-black text-base">Fuel Delivery Verification Form</h3>
-                <p className="text-xs text-blue-200">Log incoming tanker delivery with mandatory Dip Verification.</p>
+                <h3 className="font-black text-base">
+                  {editingDelivery ? 'Edit Fuel Delivery Record' : 'Record Fuel Delivery Entry'}
+                </h3>
+                <p className="text-xs text-blue-200">
+                  Enter Fuel Rate (PKR/Litre) and Quantity. Total Cost calculates automatically.
+                </p>
               </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="p-1 rounded-lg bg-white/10 text-white hover:bg-white/20">
+              <button
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setEditingDelivery(null);
+                }}
+                className="p-1 rounded-lg bg-white/10 text-white hover:bg-white/20 cursor-pointer"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+            <form onSubmit={handleFormSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Delivery Date</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-blue-800" /> Delivery Date
+                  </label>
                   <input
                     type="date"
                     value={deliveryDate}
                     onChange={e => setDeliveryDate(e.target.value)}
+                    required
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-red-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Delivery Time</label>
-                  <input
-                    type="text"
-                    value={deliveryTime}
-                    onChange={e => setDeliveryTime(e.target.value)}
-                    placeholder="11:00 AM"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none"
-                  />
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Select Tank</label>
+                  <select
+                    value={tankId}
+                    onChange={e => setTankId(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-red-600"
+                  >
+                    {tanks.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.tankName} ({t.fuelType})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -361,7 +451,7 @@ export const FuelDeliveriesView: React.FC = () => {
                   <select
                     value={fuelType}
                     onChange={e => setFuelType(e.target.value as FuelType)}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-extrabold outline-none"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-extrabold outline-none focus:border-red-600"
                   >
                     <option value="Petrol">Super Petrol</option>
                     <option value="Diesel">High Speed Diesel</option>
@@ -369,30 +459,88 @@ export const FuelDeliveriesView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Quantity (Litres)</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Quantity (Litres)
+                  </label>
                   <input
                     type="number"
-                    value={fuelType === 'Petrol' ? petrolLiters : dieselLiters}
+                    value={quantity}
                     onChange={e => {
                       const val = Number(e.target.value);
                       if (fuelType === 'Petrol') setPetrolLiters(val);
                       else setDieselLiters(val);
                     }}
                     required
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none"
+                    min={1}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-red-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Supplier Name</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Fuel Rate (PKR per Litre)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={fuelRate}
+                    onChange={e => setFuelRate(Number(e.target.value))}
+                    required
+                    min={0.01}
+                    placeholder="e.g. 252.75"
+                    className="w-full p-2.5 rounded-xl border border-blue-400 bg-blue-50/30 text-xs font-black text-blue-900 outline-none focus:border-blue-700"
+                  />
+                </div>
+              </div>
+
+              {/* AUTOMATIC TOTAL COST BANNER */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-center justify-between shadow-inner">
+                <div>
+                  <p className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">
+                    Total Cost (Automatically Calculated)
+                  </p>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {formatLiters(quantity)} × PKR {fuelRate.toFixed(2)}/Litre
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-black text-emerald-400">{formatCurrency(totalPurchaseAmount)}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Supplier Name (Optional)</label>
                   <input
                     type="text"
                     value={supplierName}
                     onChange={e => setSupplierName(e.target.value)}
                     placeholder="Pakistan State Oil (PSO)"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-medium outline-none"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-medium outline-none focus:border-red-600"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Invoice Number (Optional)</label>
+                  <input
+                    type="text"
+                    value={invoiceNumber}
+                    onChange={e => setInvoiceNumber(e.target.value)}
+                    placeholder="PSO-INV-12345"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold outline-none focus:border-red-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Notes / Remarks (Optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="Optional delivery notes or remarks..."
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-medium outline-none focus:border-red-600"
+                  rows={2}
+                />
               </div>
 
               {/* DIP MEASUREMENT VERIFICATION CARD */}
@@ -452,43 +600,17 @@ export const FuelDeliveriesView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Invoice Number</label>
-                  <input
-                    type="text"
-                    value={invoiceNumber}
-                    onChange={e => setInvoiceNumber(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Select Tank</label>
-                  <select
-                    value={tankId}
-                    onChange={e => setTankId(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none"
-                  >
-                    {tanks.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.tankName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs sm:text-sm shadow-md transition-all mt-4"
+                className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs sm:text-sm shadow-md transition-all mt-4 cursor-pointer"
               >
-                Confirm Dip Verification & Save Delivery Log
+                {editingDelivery ? 'Update Fuel Delivery Record' : 'Confirm & Save Fuel Delivery Entry'}
               </button>
             </form>
           </div>
         </div>
       )}
+
       {/* Delete Delivery Confirmation Modal */}
       <ConfirmDeleteModal
         isOpen={deliveryToDelete !== null}
@@ -505,3 +627,4 @@ export const FuelDeliveriesView: React.FC = () => {
     </div>
   );
 };
+

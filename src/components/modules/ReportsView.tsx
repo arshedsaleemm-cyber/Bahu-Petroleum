@@ -172,18 +172,21 @@ export const ReportsView: React.FC = () => {
 
             {reportType === 'DELIVERIES' && (
               <div className="space-y-2">
-                {deliveries.map(d => (
-                  <div key={d.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                    <div>
-                      <p className="font-bold text-slate-900">{d.supplierName} ({d.fuelType})</p>
-                      <p className="text-[11px] text-slate-500">Invoice: {d.invoiceNumber} • Vehicle: {d.vehicleNumber}</p>
+                {deliveries.map(d => {
+                  const rate = d.fuelRate || (d.fuelType === 'Petrol' ? d.purchaseRatePetrol : d.purchaseRateDiesel) || (d.totalLitersReceived ? d.totalPurchaseAmount / d.totalLitersReceived : 0);
+                  return (
+                    <div key={d.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                      <div>
+                        <p className="font-bold text-slate-900">{d.supplierName} ({d.fuelType})</p>
+                        <p className="text-[11px] text-slate-500">Invoice: {d.invoiceNumber} • Rate: PKR {rate.toFixed(2)}/L</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-red-600">{formatCurrency(d.totalPurchaseAmount)}</p>
+                        <p className="text-[11px] text-slate-500">{formatLiters(d.totalLitersReceived)}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-black text-red-600">{formatCurrency(d.totalPurchaseAmount)}</p>
-                      <p className="text-[11px] text-slate-500">{formatLiters(d.totalLitersReceived)}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

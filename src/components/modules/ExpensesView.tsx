@@ -5,12 +5,13 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 import { PermissionNotice } from '../common/PermissionNotice';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 import { PDFExportButton } from '../common/PDFExportButton';
-import { Receipt, Plus, Search, Tag, Calendar, Trash2, X, Paperclip } from 'lucide-react';
+import { Receipt, Plus, Search, Tag, Calendar, Trash2, X, Paperclip, Edit2 } from 'lucide-react';
 
 export const ExpensesView: React.FC = () => {
-  const { expenses, categories, addExpense, addExpenseCategory, deleteExpense, canDelete } = useApp();
+  const { expenses, categories, addExpense, updateExpense, addExpenseCategory, deleteExpense, canEdit, canDelete } = useApp();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
@@ -26,8 +27,9 @@ export const ExpensesView: React.FC = () => {
   const [newCatName, setNewCatName] = useState('');
 
   const openAddModal = () => {
+    setEditingExpense(null);
     setTitle('Office Stationery & Water Dispensers');
-    setCategory('Office Expenses');
+    setCategory(categories[0]?.name || 'Office Expenses');
     setAmount(4500);
     setExpenseDate(new Date().toISOString().slice(0, 10));
     setExpenseTime('02:00 PM');
@@ -35,18 +37,43 @@ export const ExpensesView: React.FC = () => {
     setIsAddModalOpen(true);
   };
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const openEditModal = (exp: Expense) => {
+    setEditingExpense(exp);
+    setTitle(exp.title);
+    setCategory(exp.category);
+    setAmount(exp.amount);
+    setExpenseDate(exp.date || new Date().toISOString().slice(0, 10));
+    setExpenseTime(exp.time || '02:00 PM');
+    setDescription(exp.description || exp.notes || '');
+    setIsAddModalOpen(true);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    addExpense({
-      title,
-      category,
-      amount,
-      date: expenseDate,
-      time: expenseTime,
-      description,
-      receiptPhotoUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=300&auto=format&fit=crop&q=80',
-    });
+    if (editingExpense) {
+      updateExpense(editingExpense.id, {
+        title,
+        category,
+        amount,
+        date: expenseDate,
+        time: expenseTime,
+        description,
+        notes: description,
+      });
+    } else {
+      addExpense({
+        title,
+        category,
+        amount,
+        date: expenseDate,
+        time: expenseTime,
+        description,
+        notes: description,
+        receiptPhotoUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=300&auto=format&fit=crop&q=80',
+      });
+    }
     setIsAddModalOpen(false);
+    setEditingExpense(null);
   };
 
   const handleAddCategorySubmit = (e: React.FormEvent) => {
@@ -153,7 +180,7 @@ export const ExpensesView: React.FC = () => {
                 <th className="p-3.5">Date & Time</th>
                 <th className="p-3.5">Logged By</th>
                 <th className="p-3.5 text-right">Amount</th>
-                {canDelete && <th className="p-3.5 text-center">Action</th>}
+                <th className="p-3.5 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
@@ -168,7 +195,7 @@ export const ExpensesView: React.FC = () => {
                   <tr key={exp.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3.5">
                       <div className="font-bold text-slate-900">{exp.title}</div>
-                      <div className="text-[11px] text-slate-500">{exp.description}</div>
+                      <div className="text-[11px] text-slate-500">{exp.description || exp.notes}</div>
                     </td>
                     <td className="p-3.5">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
@@ -183,17 +210,26 @@ export const ExpensesView: React.FC = () => {
                     <td className="p-3.5 text-right font-black text-amber-700">
                       {formatCurrency(exp.amount)}
                     </td>
-                    {canDelete && (
-                      <td className="p-3.5 text-center">
+                    <td className="p-3.5 text-center">
+                      <div className="flex items-center justify-center gap-1">
                         <button
-                          onClick={() => setExpenseToDelete(exp.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                          title="Delete Expense Record"
+                          onClick={() => openEditModal(exp)}
+                          className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all cursor-pointer"
+                          title="Edit Expense Record"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Edit2 className="w-4 h-4" />
                         </button>
-                      </td>
-                    )}
+                        {canDelete && (
+                          <button
+                            onClick={() => setExpenseToDelete(exp.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                            title="Delete Expense Record"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -202,37 +238,33 @@ export const ExpensesView: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Expense Modal */}
+      {/* Add / Edit Expense Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
             <div className="bg-amber-600 p-4 text-white flex items-center justify-between">
-              <h3 className="font-extrabold text-base">Record New Expense</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="p-1 rounded bg-white/10 text-white">
+              <h3 className="font-extrabold text-base">
+                {editingExpense ? 'Edit Expense Record' : 'Record New Expense'}
+              </h3>
+              <button
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setEditingExpense(null);
+                }}
+                className="p-1 rounded bg-white/10 text-white cursor-pointer"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Expense Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  required
-                  placeholder="e.g. LESCO Commercial Electricity Bill"
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-medium outline-none"
-                />
-              </div>
-
+            <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Category</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Expense Category</label>
                   <select
                     value={category}
                     onChange={e => setCategory(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-amber-600"
                   >
                     {categories.map(c => (
                       <option key={c.id} value={c.name}>
@@ -249,27 +281,53 @@ export const ExpensesView: React.FC = () => {
                     onChange={e => setAmount(Number(e.target.value))}
                     required
                     min={1}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-amber-600"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Description / Voucher Note</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Expense Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  required
+                  placeholder="e.g. LESCO Commercial Electricity Bill"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-medium outline-none focus:border-amber-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-600" /> Expense Date (Manual Selection)
+                </label>
+                <input
+                  type="date"
+                  value={expenseDate}
+                  onChange={e => setExpenseDate(e.target.value)}
+                  required
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-amber-600"
+                />
+                <span className="text-[10px] text-slate-500 mt-0.5 block">Select today's date, previous date, or future date</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Notes / Description (Optional)</label>
                 <textarea
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder="Details of expenditure..."
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-medium outline-none"
+                  placeholder="Optional details or notes regarding this expenditure..."
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-medium outline-none focus:border-amber-600"
                   rows={2}
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md"
+                className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
               >
-                Save Expense Entry
+                {editingExpense ? 'Update Expense Record' : 'Save Expense Entry'}
               </button>
             </form>
           </div>

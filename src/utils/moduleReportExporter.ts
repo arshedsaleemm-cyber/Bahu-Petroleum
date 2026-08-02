@@ -117,16 +117,20 @@ export const exportModulePDF = (
             { label: 'Total Fuel Received', value: formatLiters(totalLiters) },
             { label: 'Total Purchase Invoice', value: formatCurrency(totalCost) },
           ],
-          headers: ['Date', 'Supplier', 'Invoice #', 'Fuel Type', 'Quantity', 'Purchase Cost', 'Tank'],
-          rows: deliveries.map((d: any) => [
-            d.deliveryDate,
-            d.supplierName,
-            d.invoiceNumber,
-            d.fuelType,
-            formatLiters(d.totalLitersReceived),
-            formatCurrency(d.totalPurchaseAmount),
-            d.destinationTank || 'Tank 1',
-          ]),
+          headers: ['Date', 'Supplier', 'Invoice #', 'Fuel Type', 'Quantity', 'Fuel Rate', 'Purchase Cost', 'Tank'],
+          rows: deliveries.map((d: any) => {
+            const rate = d.fuelRate || (d.fuelType === 'Petrol' ? d.purchaseRatePetrol : d.purchaseRateDiesel) || (d.totalLitersReceived ? d.totalPurchaseAmount / d.totalLitersReceived : 0);
+            return [
+              d.deliveryDate,
+              d.supplierName,
+              d.invoiceNumber,
+              d.fuelType,
+              formatLiters(d.totalLitersReceived),
+              `PKR ${rate.toFixed(2)}/L`,
+              formatCurrency(d.totalPurchaseAmount),
+              d.tankName || d.destinationTank || 'Tank 1',
+            ];
+          }),
         },
       ];
       generateProfessionalPDF('Fuel Deliveries Report', label, sections, 'Fuel_Deliveries_Report');

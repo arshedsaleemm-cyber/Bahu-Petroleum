@@ -163,6 +163,7 @@ interface AppContextType {
   deleteEmployee: (id: string) => void;
 
   addDelivery: (data: Omit<FuelDelivery, 'id' | 'createdAt' | 'createdBy'>) => void;
+  updateDelivery: (id: string, data: Partial<FuelDelivery>) => void;
   deleteDelivery: (id: string) => void;
   addTank: (data: Omit<Tank, 'id'>) => void;
   updateTank: (tank: Tank) => void;
@@ -196,6 +197,7 @@ interface AppContextType {
   deleteUdhaarTransaction: (customerId: string, transactionId: string) => void;
   addExpenseCategory: (name: string) => void;
   addExpense: (data: Omit<Expense, 'id' | 'createdBy'>) => void;
+  updateExpense: (id: string, data: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
   addBankAccount: (data: Omit<BankAccount, 'id'>) => void;
   deleteBankAccount: (id: string) => void;
@@ -836,6 +838,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateDelivery = (id: string, data: Partial<FuelDelivery>) => {
+    setDeliveries(prev =>
+      prev.map(d => {
+        if (d.id === id) {
+          const updated = { ...d, ...data };
+          syncSaveDoc('deliveries', updated);
+          return updated;
+        }
+        return d;
+      })
+    );
+  };
+
   const deleteDelivery = (id: string) => {
     if (!canDelete) return;
     const del = deliveries.find(d => d.id === id);
@@ -1165,6 +1180,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newExp: Expense = { ...data, id: `exp-${Date.now()}`, createdBy: currentUser?.name || 'System' };
     setExpenses(prev => [newExp, ...prev]);
     syncSaveDoc('expenses', newExp);
+  };
+
+  const updateExpense = (id: string, data: Partial<Expense>) => {
+    setExpenses(prev =>
+      prev.map(e => {
+        if (e.id === id) {
+          const updated = { ...e, ...data };
+          syncSaveDoc('expenses', updated);
+          return updated;
+        }
+        return e;
+      })
+    );
   };
 
   const deleteExpense = (id: string) => {
@@ -1815,6 +1843,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleEmployeeStatus,
         deleteEmployee,
         addDelivery,
+        updateDelivery,
         deleteDelivery,
         addTank,
         updateTank,
@@ -1839,6 +1868,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteUdhaarTransaction,
         addExpenseCategory,
         addExpense,
+        updateExpense,
         deleteExpense,
         addBankAccount,
         deleteBankAccount,

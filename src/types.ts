@@ -28,6 +28,7 @@ export interface FuelDelivery {
   vehicleNumber?: string;
   driverName?: string;
   totalLitersReceived: number;
+  fuelRate?: number;
   purchaseRatePetrol: number;
   purchaseRateDiesel: number;
   totalPurchaseAmount: number;

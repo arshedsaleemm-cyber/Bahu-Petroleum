@@ -184,6 +184,7 @@ interface AppContextType {
   updateWorker: (worker: Worker) => void;
   deleteWorker: (id: string) => void;
   markAttendance: (workerId: string, status: AttendanceRecord['status'], date: string, notes?: string) => void;
+  bulkSaveAttendance: (records: { workerId: string; status: AttendanceRecord['status']; date: string }[]) => void;
   deleteAttendance: (id: string) => void;
   addSalaryAdvance: (workerId: string, amount: number, notes?: string) => void;
   deleteAdvanceRecord: (workerId: string, advanceId: string) => void;
@@ -1076,6 +1077,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const newAtt: AttendanceRecord = { id: `att-${Date.now()}`, workerId, date, status, notes };
       syncSaveDoc('attendance', newAtt);
       return [...prev, newAtt];
+    });
+  };
+
+  const bulkSaveAttendance = (records: { workerId: string; status: AttendanceRecord['status']; date: string }[]) => {
+    if (!canEdit) return;
+    setAttendance(prev => {
+      let next = [...prev];
+      records.forEach(rec => {
+        const existingIdx = next.findIndex(a => a.workerId === rec.workerId && a.date === rec.date);
+        if (existingIdx >= 0) {
+          const updated = { ...next[existingIdx], status: rec.status };
+          next[existingIdx] = updated;
+          syncSaveDoc('attendance', updated);
+        } else {
+          const newAtt: AttendanceRecord = {
+            id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            workerId: rec.workerId,
+            date: rec.date,
+            status: rec.status,
+          };
+          next.push(newAtt);
+          syncSaveDoc('attendance', newAtt);
+        }
+      });
+      return next;
     });
   };
 
@@ -2052,6 +2078,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateWorker,
         deleteWorker,
         markAttendance,
+        bulkSaveAttendance,
         deleteAttendance,
         addSalaryAdvance,
         deleteAdvanceRecord,

@@ -1018,7 +1018,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Workers
   const addWorker = (data: Omit<Worker, 'id'>) => {
     const newId = `w-${Date.now()}`;
-    const newWorker: Worker = { ...data, id: newId };
+    const newWorker: Worker = { status: 'Active', ...data, id: newId };
     const newSalary: SalaryRecord = {
       id: `sal-${Date.now()}`,
       workerId: newId,
@@ -1037,7 +1037,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateWorker = (worker: Worker) => {
     if (!canEdit) return;
-    setWorkers(prev => prev.map(w => (w.id === worker.id ? worker : w)));
+    const updatedWorker: Worker = { status: 'Active', ...worker };
+    setWorkers(prev => prev.map(w => (w.id === worker.id ? updatedWorker : w)));
     setSalaries(prev =>
       prev.map(s => {
         if (s.workerId === worker.id) {
@@ -1054,7 +1055,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return s;
       })
     );
-    syncSaveDoc('workers', worker);
+    syncSaveDoc('workers', updatedWorker);
   };
 
   const deleteWorker = (id: string) => {
@@ -1064,6 +1065,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markAttendance = (workerId: string, status: AttendanceRecord['status'], date: string, notes?: string) => {
+    if (!canEdit) return;
     setAttendance(prev => {
       const existing = prev.find(a => a.workerId === workerId && a.date === date);
       if (existing) {

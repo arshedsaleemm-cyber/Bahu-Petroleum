@@ -32,6 +32,7 @@ export const BahuAIAssistantView: React.FC = () => {
     lubricants,
     workers,
     salaries,
+    attendance,
     markAttendance,
     addSalaryAdvance,
     paySalary,
@@ -429,12 +430,46 @@ How can I assist you today?`,
       })),
       workers: (workers || []).map((w) => {
         const sal = (salaries || []).find((s) => s.workerId === w.id);
+        const wAtt = (attendance || []).filter((a) => a.workerId === w.id);
+        const presentDays = wAtt.filter((a) => a.status === 'Present').length;
+        const absentDays = wAtt.filter((a) => a.status === 'Absent').length;
+        const leaveDays = wAtt.filter((a) => a.status === 'Leave').length;
+        const halfDays = wAtt.filter((a) => a.status === 'Half Day').length;
+
+        // Current month attendance
+        const currentMonthPrefix = new Date().toISOString().slice(0, 7);
+        const currentMonthAtt = wAtt.filter((a) => a.date.startsWith(currentMonthPrefix));
+        const monthPresent = currentMonthAtt.filter((a) => a.status === 'Present').length;
+        const monthAbsent = currentMonthAtt.filter((a) => a.status === 'Absent').length;
+        const monthLeave = currentMonthAtt.filter((a) => a.status === 'Leave').length;
+        const monthHalfDays = currentMonthAtt.filter((a) => a.status === 'Half Day').length;
+
         return {
+          id: w.id,
           name: w.name,
-          designation: w.designation,
+          status: w.status || 'Active',
+          monthlySalary: w.monthlySalary || 0,
           pendingSalary: sal?.pendingSalary || 0,
           advanceBalance: sal?.totalAdvance || 0,
-          status: w.status,
+          totalPresentDays: presentDays,
+          totalAbsentDays: absentDays,
+          totalLeaveDays: leaveDays,
+          totalHalfDays: halfDays,
+          thisMonthAttendance: {
+            present: monthPresent,
+            absent: monthAbsent,
+            leave: monthLeave,
+            halfDays: monthHalfDays,
+          },
+        };
+      }),
+      recentAttendanceRecords: (attendance || []).slice(-30).map((a) => {
+        const worker = (workers || []).find((w) => w.id === a.workerId);
+        return {
+          date: a.date,
+          workerName: worker?.name || 'Unknown',
+          status: a.status,
+          notes: a.notes,
         };
       }),
       expenses: (expenses || []).slice(-20),

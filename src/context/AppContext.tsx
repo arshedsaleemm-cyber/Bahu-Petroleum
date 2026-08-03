@@ -1038,6 +1038,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateWorker = (worker: Worker) => {
     if (!canEdit) return;
     setWorkers(prev => prev.map(w => (w.id === worker.id ? worker : w)));
+    setSalaries(prev =>
+      prev.map(s => {
+        if (s.workerId === worker.id) {
+          const remaining = Math.max(0, (worker.monthlySalary || 0) - s.totalAdvance - s.salaryPaid);
+          const updatedSalary: SalaryRecord = {
+            ...s,
+            monthlySalary: worker.monthlySalary || 0,
+            pendingSalary: remaining,
+            remainingSalary: remaining,
+          };
+          syncSaveDoc('salaries', updatedSalary);
+          return updatedSalary;
+        }
+        return s;
+      })
+    );
     syncSaveDoc('workers', worker);
   };
 

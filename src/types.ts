@@ -85,16 +85,16 @@ export interface LubricantProduct {
 
 export interface Worker {
   id: string;
-  photoUrl?: string;
   name: string;
-  fatherName: string;
-  phoneNumber: string;
-  cnic: string;
-  address: string;
-  designation: string;
-  joiningDate: string;
   monthlySalary: number;
-  status: 'Active' | 'Inactive';
+  photoUrl?: string;
+  fatherName?: string;
+  phoneNumber?: string;
+  cnic?: string;
+  address?: string;
+  designation?: string;
+  joiningDate?: string;
+  status?: 'Active' | 'Inactive';
 }
 
 export type AttendanceStatus = 'Present' | 'Absent' | 'Leave' | 'Half Day';

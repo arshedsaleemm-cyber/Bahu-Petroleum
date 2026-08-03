@@ -91,7 +91,7 @@ export const SalaryView: React.FC = () => {
                   />
                   <div>
                     <h3 className="font-extrabold text-slate-900 text-base">{w.name}</h3>
-                    <p className="text-xs text-slate-500">{w.designation}</p>
+                    <p className="text-xs text-slate-500">{w.designation || 'Staff Member'}</p>
                   </div>
                 </div>
 

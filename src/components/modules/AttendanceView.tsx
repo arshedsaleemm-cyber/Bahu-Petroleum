@@ -105,7 +105,7 @@ export const AttendanceView: React.FC = () => {
                   />
                   <div>
                     <p className="font-bold text-slate-900 text-sm">{w.name}</p>
-                    <p className="text-xs text-slate-500">{w.designation}</p>
+                    <p className="text-xs text-slate-500">{w.designation || 'Staff Member'}</p>
                   </div>
                 </div>
 

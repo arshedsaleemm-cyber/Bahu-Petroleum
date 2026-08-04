@@ -66,7 +66,6 @@ export const Sidebar: React.FC = () => {
       badgeColor: 'bg-red-600',
       category: 'Fuel Operations',
     },
-    { id: 'daily_petrol_cash', label: 'Daily Petrol Cash', icon: Droplet, category: 'Fuel Operations' },
     { id: 'customers', label: 'Credit Customers (Udhaar)', icon: Users, category: 'Accounts & People' },
     { id: 'workers', label: 'Workers', icon: UserCheck, category: 'Accounts & People' },
     { id: 'attendance', label: 'Attendance', icon: CalendarCheck, category: 'Accounts & People' },

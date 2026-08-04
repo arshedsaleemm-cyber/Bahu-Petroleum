@@ -438,8 +438,7 @@ export type DailySalesSection =
   | 'Tuck Shop'
   | 'Lubricants'
   | 'Credit Card'
-  | 'Infinity Card'
-  | 'Daily Petrol Cash';
+  | 'Infinity Card';
 
 export interface DailySalesEntry {
   id: string;

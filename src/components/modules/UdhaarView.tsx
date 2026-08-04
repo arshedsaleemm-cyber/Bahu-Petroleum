@@ -902,51 +902,69 @@ export const UdhaarView: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                      {activeCustomer.transactions.map(tx => (
-                        <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-3 whitespace-nowrap">
-                            <div className="font-bold text-slate-900">{formatDate(tx.date)}</div>
-                            <div className="text-[10px] text-slate-400">{tx.time || '12:00 PM'}</div>
-                          </td>
-                          <td className="p-3">
-                            <div className="font-semibold text-slate-800">{tx.description || '-'}</div>
-                            {tx.vehicleNumber && <div className="text-[10px] text-blue-600 font-bold">{tx.vehicleNumber}</div>}
-                          </td>
-                          <td className="p-3 text-right font-extrabold text-rose-700 whitespace-nowrap">
-                            {tx.type === 'CREDIT_PURCHASE' ? formatCurrency(tx.amount) : '-'}
-                          </td>
-                          <td className="p-3 text-right font-extrabold text-emerald-700 whitespace-nowrap">
-                            {tx.type === 'PAYMENT_RECEIVED' ? formatCurrency(tx.amount) : '-'}
-                          </td>
-                          <td className="p-3 text-right font-black text-slate-900 whitespace-nowrap">
-                            {formatCurrency(tx.runningBalance !== undefined ? tx.runningBalance : tx.amount)}
-                          </td>
-                          <td className="p-3 text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-1">
-                              {canEdit && (
-                                <button
-                                  onClick={() => openEditTxModal(activeCustomer, tx)}
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer"
-                                  title="Edit Transaction"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              {canDelete && (
-                                <AdminDeleteButton
-                                  onDelete={() => {
-                                    deleteUdhaarTransaction(activeCustomer.id, tx.id);
-                                    const updated = udhaarCustomers.find(c => c.id === activeCustomer.id);
-                                    if (updated) setSelectedCust(updated);
-                                  }}
-                                  variant="small-icon"
-                                  itemName={`Transaction ${formatCurrency(tx.amount)}`}
-                                />
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {(() => {
+                        const sorted = [...activeCustomer.transactions].sort((a, b) => {
+                          const timeA = new Date(`${a.date || ''}T${a.time || '00:00'}`).getTime();
+                          const timeB = new Date(`${b.date || ''}T${b.time || '00:00'}`).getTime();
+                          if (isNaN(timeA) || isNaN(timeB)) return (a.date || '').localeCompare(b.date || '');
+                          return timeA - timeB;
+                        });
+
+                        let rBal = 0;
+                        return sorted.map(tx => {
+                          if (tx.type === 'CREDIT_PURCHASE') {
+                            rBal += tx.amount || 0;
+                          } else {
+                            rBal -= tx.amount || 0;
+                          }
+
+                          return (
+                            <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-3 whitespace-nowrap">
+                                <div className="font-bold text-slate-900">{formatDate(tx.date)}</div>
+                                <div className="text-[10px] text-slate-400">{tx.time || '12:00 PM'}</div>
+                              </td>
+                              <td className="p-3">
+                                <div className="font-semibold text-slate-800">{tx.description || '-'}</div>
+                                {tx.vehicleNumber && <div className="text-[10px] text-blue-600 font-bold">{tx.vehicleNumber}</div>}
+                              </td>
+                              <td className="p-3 text-right font-extrabold text-rose-700 whitespace-nowrap">
+                                {tx.type === 'CREDIT_PURCHASE' ? formatCurrency(tx.amount) : '-'}
+                              </td>
+                              <td className="p-3 text-right font-extrabold text-emerald-700 whitespace-nowrap">
+                                {tx.type === 'PAYMENT_RECEIVED' ? formatCurrency(tx.amount) : '-'}
+                              </td>
+                              <td className="p-3 text-right font-black text-slate-900 whitespace-nowrap">
+                                {formatCurrency(rBal)}
+                              </td>
+                              <td className="p-3 text-center whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1">
+                                  {canEdit && (
+                                    <button
+                                      onClick={() => openEditTxModal(activeCustomer, tx)}
+                                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer"
+                                      title="Edit Transaction"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {canDelete && (
+                                    <AdminDeleteButton
+                                      onDelete={() => {
+                                        deleteUdhaarTransaction(activeCustomer.id, tx.id);
+                                        const updated = udhaarCustomers.find(c => c.id === activeCustomer.id);
+                                        if (updated) setSelectedCust(updated);
+                                      }}
+                                      variant="small-icon"
+                                      itemName={`Transaction ${formatCurrency(tx.amount)}`}
+                                    />
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>

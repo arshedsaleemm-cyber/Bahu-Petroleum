@@ -5,6 +5,7 @@ import { Sidebar } from './components/common/Sidebar';
 import { MobileNav } from './components/common/MobileNav';
 import { FAB } from './components/common/FAB';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal';
+import { PDFSuccessModal } from './components/common/PDFSuccessModal';
 
 // Views
 import { LoginView } from './components/modules/LoginView';
@@ -26,7 +27,6 @@ import { TuckShopView } from './components/modules/TuckShopView';
 import { RestaurantView } from './components/modules/RestaurantView';
 import { CreditCardSalesView } from './components/modules/CreditCardSalesView';
 import { InfiniCardSalesView } from './components/modules/InfiniCardSalesView';
-import { DailyPetrolCashView } from './components/modules/DailyPetrolCashView';
 import { BahuAIAssistantView } from './components/modules/BahuAIAssistantView';
 import { ReportsView } from './components/modules/ReportsView';
 import { SettingsView } from './components/modules/SettingsView';
@@ -68,7 +68,7 @@ const MainLayout: React.FC = () => {
       case 'expenses':
         return <ExpensesView />;
       case 'daily_petrol_cash':
-        return <DailyPetrolCashView />;
+        return <FuelSalesView />;
       case 'bank':
       case 'cash':
         return <BankView />;
@@ -122,6 +122,9 @@ const MainLayout: React.FC = () => {
 
       {/* Global Search */}
       {isSearchOpen && <GlobalSearchModal onClose={() => setIsSearchOpen(false)} />}
+
+      {/* Global PDF Export Confirmation & Share Modal */}
+      <PDFSuccessModal />
     </div>
   );
 };

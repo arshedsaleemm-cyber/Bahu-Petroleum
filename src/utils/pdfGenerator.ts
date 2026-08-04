@@ -235,8 +235,30 @@ export const generateProfessionalPDF = (
     doc.text(`Page ${i} of ${totalPages}`, pageWidth - 30, pageHeight - 7);
   }
 
-  // Trigger Save
+  // Trigger Save & Dispatch PDF Export Event for Open/Share feedback
   const sanitizedTitle = fileNamePrefix.replace(/[^a-zA-Z0-9_]/g, '_');
   const dateTag = new Date().toISOString().slice(0, 10);
-  doc.save(`Bahu_Petroleum_${sanitizedTitle}_${dateTag}.pdf`);
+  const fullFileName = `Bahu_Petroleum_${sanitizedTitle}_${dateTag}.pdf`;
+
+  doc.save(fullFileName);
+
+  try {
+    const pdfBlob = doc.output('blob');
+    const blobUrl = URL.createObjectURL(pdfBlob);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('pdf_exported', {
+          detail: {
+            title: reportTitle,
+            fileName: fullFileName,
+            blob: pdfBlob,
+            blobUrl,
+          },
+        })
+      );
+    }
+  } catch (err) {
+    console.error('Error generating PDF Blob for share event:', err);
+  }
 };

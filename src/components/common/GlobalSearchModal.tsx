@@ -238,7 +238,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ onClose })
                       case 'Lubricants': return 'lubricants';
                       case 'Credit Card': return 'credit_card';
                       case 'Infinity Card': return 'infini_card';
-                      case 'Daily Petrol Cash': return 'daily_petrol_cash';
                       default: return 'dashboard';
                     }
                   };

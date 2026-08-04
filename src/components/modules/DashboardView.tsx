@@ -153,10 +153,10 @@ export const DashboardView: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => setCurrentView('daily_petrol_cash')}
-            className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
+            onClick={() => setCurrentView('fuel_sales')}
+            className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Daily Petrol Cash
+            <Plus className="w-4 h-4" /> Record Fuel Sale
           </button>
           <button
             onClick={() => setCurrentView('deliveries')}
@@ -218,7 +218,7 @@ export const DashboardView: React.FC = () => {
 
         {/* Today's Sales */}
         <div
-          onClick={() => setCurrentView('daily_petrol_cash')}
+          onClick={() => setCurrentView('fuel_sales')}
           className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:border-blue-400 transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
@@ -305,7 +305,7 @@ export const DashboardView: React.FC = () => {
         {/* Quick Module Buttons Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-1 border-t border-blue-800/60">
           {[
-            { key: 'daily_petrol_cash', label: 'Petrol Cash', section: 'Daily Petrol Cash' },
+            { key: 'fuel_sales', label: 'Fuel Sales', section: 'Fuel Sales', isFuel: true },
             { key: 'credit_card', label: 'Credit Card', section: 'Credit Card' },
             { key: 'infini_card', label: 'Infini Card', section: 'Infinity Card' },
             { key: 'lubricants', label: 'Lubricants', section: 'Lubricants' },
@@ -314,9 +314,11 @@ export const DashboardView: React.FC = () => {
             { key: 'tuck_shop', label: 'Tuck Shop', section: 'Tuck Shop' },
             { key: 'restaurant', label: 'Fast Food', section: 'Fast Food' },
           ].map(mod => {
-            const sum = (dailySalesEntries || [])
-              .filter(e => e.date === todayIso && e.section === mod.section)
-              .reduce((a, b) => a + (b.totalSales || 0), 0);
+            const sum = mod.isFuel
+              ? (fuelSales || []).filter(s => s.date === todayIso).reduce((a, b) => a + (b.totalSaleAmount || 0), 0)
+              : (dailySalesEntries || [])
+                  .filter(e => e.date === todayIso && e.section === mod.section)
+                  .reduce((a, b) => a + (b.totalSales || 0), 0);
             return (
               <button
                 key={mod.key}

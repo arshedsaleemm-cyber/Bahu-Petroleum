@@ -341,7 +341,7 @@ How can I assist you today?`,
 
   // Helper to compile live database snapshot
   const prepareDatabaseSnapshot = () => {
-    const fuelRevenue = (dailySalesEntries || []).reduce((acc, curr) => acc + (curr.totalSales || 0), 0);
+    const fuelRevenue = (fuelSales || []).reduce((acc, curr) => acc + (curr.totalSaleAmount || 0), 0);
     const lubricantRevenue = (lubricants || []).reduce(
       (acc, curr) => acc + (curr.stockIn - curr.remainingStock) * curr.sellingPrice,
       0

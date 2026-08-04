@@ -7,12 +7,14 @@ import { ReportsPDFCenter } from './ReportsPDFCenter';
 import { FileText, FileSpreadsheet, PieChart, BarChart3, Download } from 'lucide-react';
 
 export const ReportsView: React.FC = () => {
-  const { deliveries, expenses, udhaarCustomers, dailySalesEntries } = useApp();
+  const { deliveries, expenses, udhaarCustomers, dailySalesEntries, fuelSales } = useApp();
 
   const [activeTab, setActiveTab] = useState<'PDF_CENTER' | 'LOGS'>('PDF_CENTER');
   const [reportType, setReportType] = useState<string>('DAILY_SALES');
 
-  const totalDailySalesAmount = (dailySalesEntries || []).reduce((acc, curr) => acc + curr.totalSales, 0);
+  const totalFuelSalesAmount = (fuelSales || []).reduce((acc, curr) => acc + curr.totalSaleAmount, 0);
+  const totalOtherSalesAmount = (dailySalesEntries || []).reduce((acc, curr) => acc + curr.totalSales, 0);
+  const totalDailySalesAmount = totalFuelSalesAmount + totalOtherSalesAmount;
   const totalDeliveriesCost = deliveries.reduce((acc, curr) => acc + curr.totalPurchaseAmount, 0);
   const totalExpensesAmount = expenses.reduce((acc, curr) => acc + curr.amount, 0);
   const netProfit = totalDailySalesAmount - totalDeliveriesCost - totalExpensesAmount;

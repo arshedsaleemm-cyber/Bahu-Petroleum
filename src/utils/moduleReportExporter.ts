@@ -5,7 +5,7 @@ import {
   generateProfessionalPDF,
   PDFSection,
 } from './pdfGenerator';
-import { formatCurrency, formatLiters } from './formatters';
+import { formatCurrency, formatLiters, formatDate } from './formatters';
 
 export type ModuleReportKey =
   | 'DASHBOARD'
@@ -44,8 +44,8 @@ export const exportModulePDF = (
 
   switch (moduleKey) {
     case 'DASHBOARD': {
-      const fuelSales = (appState.dailySalesEntries || []).filter((e: any) => isDateInRange(e.date, range));
-      const totalFuelRev = fuelSales.reduce((sum: number, e: any) => sum + (e.totalSales || 0), 0);
+      const fuelSales = (appState.fuelSales || []).filter((s: any) => isDateInRange(s.date, range));
+      const totalFuelRev = fuelSales.reduce((sum: number, s: any) => sum + (s.totalSaleAmount || 0), 0);
       const deliveryCost = (appState.deliveries || [])
         .filter((d: any) => isDateInRange(d.deliveryDate, range))
         .reduce((sum: number, d: any) => sum + (d.totalPurchaseAmount || 0), 0);
@@ -81,68 +81,105 @@ export const exportModulePDF = (
 
     case 'FUEL_SALES': {
       const fuelSales = (appState.fuelSales || []).filter((s: any) => isDateInRange(s.date, range));
-      const dailyEntries = (appState.dailySalesEntries || []).filter((e: any) => isDateInRange(e.date, range));
+      const deliveries = appState.deliveries || [];
+
+      // Calculate weighted average purchase rate per fuel type
+      const getPurchaseRate = (ft: string) => {
+        const ftDeliveries = deliveries.filter((d: any) =>
+          d.fuelType === ft ||
+          (ft === 'Super Petrol' && d.fuelType === 'Petrol') ||
+          (ft === 'High-Speed Diesel (HSD)' && d.fuelType === 'Diesel')
+        );
+        const totalLiters = ftDeliveries.reduce((sum: number, d: any) => sum + (d.totalLitersReceived || d.petrolLiters || d.dieselLiters || 0), 0);
+        const totalCost = ftDeliveries.reduce((sum: number, d: any) => sum + (d.totalPurchaseAmount || 0), 0);
+        if (totalLiters > 0 && totalCost > 0) return totalCost / totalLiters;
+        if (ftDeliveries.length > 0) {
+          const last = ftDeliveries[ftDeliveries.length - 1];
+          if (ft === 'Super Petrol' && last.purchaseRatePetrol) return last.purchaseRatePetrol;
+          if (ft === 'High-Speed Diesel (HSD)' && last.purchaseRateDiesel) return last.purchaseRateDiesel;
+          if (last.fuelRate) return last.fuelRate;
+        }
+        if (ft === 'Super Petrol') return 250;
+        if (ft === 'High-Speed Diesel (HSD)') return 260;
+        if (ft === 'Excellium High-Octane') return 280;
+        return 250;
+      };
+
+      const purchaseRates: Record<string, number> = {
+        'Super Petrol': getPurchaseRate('Super Petrol'),
+        'High-Speed Diesel (HSD)': getPurchaseRate('High-Speed Diesel (HSD)'),
+        'Excellium High-Octane': getPurchaseRate('Excellium High-Octane'),
+      };
 
       const totalLiters = fuelSales.reduce((sum: number, s: any) => sum + (s.quantityLiters || 0), 0);
       const totalFuelSalesAmt = fuelSales.reduce((sum: number, s: any) => sum + (s.totalSaleAmount || 0), 0);
-      const totalDailySalesAmt = dailyEntries.reduce((sum: number, e: any) => sum + (e.totalSales || 0), 0);
+      const totalPurchaseCost = fuelSales.reduce((sum: number, s: any) => {
+        const rate = purchaseRates[s.fuelType] || 250;
+        return sum + ((s.quantityLiters || 0) * rate);
+      }, 0);
+      const grossProfit = totalFuelSalesAmt - totalPurchaseCost;
 
       // Fuel type breakdown
       const fuelTypes = ['Super Petrol', 'High-Speed Diesel (HSD)', 'Excellium High-Octane'];
       const fuelTypeRows = fuelTypes.map(ft => {
         const ftSales = fuelSales.filter((s: any) => s.fuelType === ft);
         const ltrs = ftSales.reduce((a: number, b: any) => a + (b.quantityLiters || 0), 0);
-        const amt = ftSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
-        return [ft, formatLiters(ltrs), formatCurrency(amt), `${ftSales.length} Transactions`];
+        const rev = ftSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
+        const rate = purchaseRates[ft] || 250;
+        const cost = ltrs * rate;
+        const profit = rev - cost;
+        const avgPrice = ltrs > 0 ? (rev / ltrs).toFixed(2) : '-';
+        return [ft, formatLiters(ltrs), avgPrice !== '-' ? `PKR ${avgPrice}` : '-', formatCurrency(rev), formatCurrency(cost), formatCurrency(profit)];
       });
 
       // Tank-wise breakdown
-      const tankMap: Record<string, { tankName: string; liters: number; amount: number; count: number }> = {};
+      const tankMap: Record<string, { tankName: string; fuelType: string; liters: number; amount: number }> = {};
       fuelSales.forEach((s: any) => {
         const tName = s.tankName || 'Tank ' + s.tankId;
         if (!tankMap[tName]) {
-          tankMap[tName] = { tankName: tName, liters: 0, amount: 0, count: 0 };
+          tankMap[tName] = { tankName: tName, fuelType: s.fuelType, liters: 0, amount: 0 };
         }
         tankMap[tName].liters += s.quantityLiters || 0;
         tankMap[tName].amount += s.totalSaleAmount || 0;
-        tankMap[tName].count += 1;
       });
 
       const tankRows = Object.values(tankMap).map(t => [
         t.tankName,
+        t.fuelType,
         formatLiters(t.liters),
         formatCurrency(t.amount),
-        `${t.count} Entries`,
       ]);
 
       const sections: PDFSection[] = [
         {
-          title: 'Fuel Sales Summary',
+          title: 'Fuel Sales Records Log',
           summaryCards: [
             { label: 'Total Litres Sold', value: formatLiters(totalLiters) },
-            { label: 'Fuel Sales Revenue', value: formatCurrency(totalFuelSalesAmt) },
-            { label: 'Total Transactions', value: `${fuelSales.length} Entries` },
+            { label: 'Total Sales Revenue', value: formatCurrency(totalFuelSalesAmt) },
+            { label: 'Total Purchase Cost', value: formatCurrency(totalPurchaseCost) },
+            { label: 'Gross Profit', value: formatCurrency(grossProfit) },
           ],
-          headers: ['Fuel Type', 'Quantity Sold', 'Total Revenue', 'Transaction Count'],
+          headers: ['Date', 'Fuel Type', 'Tank Name', 'Quantity Sold (L)', 'Selling Price/L', 'Total Sale Amount (PKR)'],
+          rows: fuelSales.length > 0
+            ? fuelSales.map((s: any) => [
+                s.date,
+                s.fuelType,
+                s.tankName || 'Tank',
+                formatLiters(s.quantityLiters),
+                s.sellingPricePerLiter ? `PKR ${s.sellingPricePerLiter}` : '-',
+                formatCurrency(s.totalSaleAmount),
+              ])
+            : [['No Fuel Sales Records', '-', '-', '0 L', '-', 'PKR 0']],
+        },
+        {
+          title: 'Fuel Type-wise Summary',
+          headers: ['Fuel Type', 'Quantity Sold (L)', 'Avg Sale Price/L', 'Sales Revenue', 'Est. Purchase Cost', 'Gross Profit'],
           rows: fuelTypeRows,
         },
         {
-          title: 'Tank-wise Fuel Sales Breakdown',
-          headers: ['Tank Name', 'Total Litres Sold', 'Total Sales Amount', 'Sales Entries'],
-          rows: tankRows.length > 0 ? tankRows : [['No Tank Data', '0 L', 'PKR 0', '0 Entries']],
-        },
-        {
-          title: 'Detailed Fuel Sales Log',
-          headers: ['Date', 'Fuel Type', 'Tank', 'Litres Sold', 'Rate/L', 'Total Sale', 'Recorded By'],
-          rows: fuelSales.map((s: any) => [
-            s.date,
-            s.fuelType,
-            s.tankName || 'Tank',
-            formatLiters(s.quantityLiters),
-            s.sellingPricePerLiter ? `PKR ${s.sellingPricePerLiter}/L` : '-',
-            formatCurrency(s.totalSaleAmount),
-            s.createdBy || 'System',
-          ]),
+          title: 'Tank-wise Summary Breakdown',
+          headers: ['Tank Name', 'Fuel Type', 'Total Litres Sold', 'Total Sales Revenue'],
+          rows: tankRows.length > 0 ? tankRows : [['No Tank Data', '-', '0 L', 'PKR 0']],
         },
       ];
 
@@ -669,9 +706,9 @@ export const exportModulePDF = (
     }
 
     case 'PROFIT_LOSS': {
-      const fuelRev = (appState.dailySalesEntries || [])
-        .filter((e: any) => isDateInRange(e.date, range))
-        .reduce((sum: number, e: any) => sum + (e.totalSales || 0), 0);
+      const fuelRev = (appState.fuelSales || [])
+        .filter((s: any) => isDateInRange(s.date, range))
+        .reduce((sum: number, s: any) => sum + (s.totalSaleAmount || 0), 0);
       const deliveryCost = (appState.deliveries || [])
         .filter((d: any) => isDateInRange(d.deliveryDate, range))
         .reduce((sum: number, d: any) => sum + (d.totalPurchaseAmount || 0), 0);
@@ -700,7 +737,7 @@ export const exportModulePDF = (
           ],
           headers: ['Revenue / Expense Stream', 'Amount (PKR)'],
           rows: [
-            ['Fuel & Petrol Cash Sales Revenue', formatCurrency(fuelRev)],
+            ['Fuel Sales Revenue', formatCurrency(fuelRev)],
             ['Car Wash Services Revenue', formatCurrency(carWashRev)],
             ['Tire Shop Services Revenue', formatCurrency(tyreShopRev)],
             ['Restaurant Fast Food Revenue', formatCurrency(restaurantRev)],
@@ -717,8 +754,8 @@ export const exportModulePDF = (
 
     case 'COMPLETE_BUSINESS': {
       // Complete Grand Monthly Master Report!
-      const fuelSales = (appState.dailySalesEntries || []).filter((e: any) => isDateInRange(e.date, range));
-      const fuelRev = fuelSales.reduce((s: number, e: any) => s + (e.totalSales || 0), 0);
+      const fuelSales = (appState.fuelSales || []).filter((s: any) => isDateInRange(s.date, range));
+      const fuelRev = fuelSales.reduce((s: number, e: any) => s + (e.totalSaleAmount || 0), 0);
 
       const deliveries = (appState.deliveries || []).filter((d: any) => isDateInRange(d.deliveryDate, range));
       const deliveryCost = deliveries.reduce((s: number, d: any) => s + (d.totalPurchaseAmount || 0), 0);
@@ -832,30 +869,89 @@ export const exportModulePDF = (
 };
 
 export const exportCustomerLedgerPDF = (customer: any) => {
+  const custName = customer.customerName || customer.name || 'Credit Customer';
+  const rawTxs = customer.transactions || [];
+
+  // Sort transactions chronologically from oldest to newest
+  const sortedTxs = [...rawTxs].sort((a: any, b: any) => {
+    const timeA = new Date(`${a.date || ''}T${a.time || '00:00'}`).getTime();
+    const timeB = new Date(`${b.date || ''}T${b.time || '00:00'}`).getTime();
+    if (isNaN(timeA) || isNaN(timeB)) {
+      return (a.date || '').localeCompare(b.date || '');
+    }
+    return timeA - timeB;
+  });
+
+  let runningBal = 0;
+  let totalCreditGiven = 0;
+  let totalPaymentsReceived = 0;
+
+  const rows = sortedTxs.map((t: any) => {
+    const isCredit = t.type === 'CREDIT_PURCHASE';
+    const amt = Number(t.amount) || 0;
+
+    if (isCredit) {
+      runningBal += amt;
+      totalCreditGiven += amt;
+    } else {
+      runningBal -= amt;
+      totalPaymentsReceived += amt;
+    }
+
+    const descParts = [];
+    if (t.description) descParts.push(t.description);
+    if (t.vehicleNumber) descParts.push(`Vehicle: ${t.vehicleNumber}`);
+    if (t.receiptNumber) descParts.push(`Receipt #: ${t.receiptNumber}`);
+    const fullDesc = descParts.length > 0 ? descParts.join(' | ') : (isCredit ? 'Credit Added' : 'Payment Received');
+
+    return [
+      formatDate(t.date),
+      isCredit ? 'Credit Added' : 'Payment Received',
+      fullDesc,
+      isCredit ? formatCurrency(amt) : '-',
+      !isCredit ? formatCurrency(amt) : '-',
+      formatCurrency(runningBal),
+    ];
+  });
+
+  // Calculate actual remaining balance
+  const currentOutstanding = customer.remainingBalance !== undefined ? customer.remainingBalance : runningBal;
+
   const sections: PDFSection[] = [
     {
-      title: `Credit Account Statement - ${customer.customerName || customer.name}`,
+      title: `CUSTOMER CREDIT SUMMARY - ${custName.toUpperCase()}`,
       summaryCards: [
-        { label: 'Customer Name', value: customer.customerName || customer.name },
-        { label: 'Mobile / Phone', value: customer.phoneNumber || 'N/A' },
-        { label: 'Credit Limit', value: formatCurrency(customer.creditLimit || 0) },
-        { label: 'Outstanding Balance', value: formatCurrency(customer.remainingBalance || 0) },
+        { label: 'Customer Name', value: custName },
+        { label: 'Current Outstanding', value: formatCurrency(currentOutstanding) },
+        { label: 'Total Credit Given', value: formatCurrency(totalCreditGiven) },
+        { label: 'Total Payments Received', value: formatCurrency(totalPaymentsReceived) },
+        { label: 'Remaining Balance', value: formatCurrency(currentOutstanding) },
       ],
-      headers: ['Date', 'Time', 'Description', 'Credit Added', 'Payment Received', 'Running Balance'],
-      rows: (customer.transactions || []).map((t: any) => [
-        t.date,
-        t.time || '12:00 PM',
-        t.description || (t.type === 'CREDIT_PURCHASE' ? 'Credit Purchase' : 'Payment Received'),
-        t.type === 'CREDIT_PURCHASE' ? formatCurrency(t.amount) : '-',
-        t.type === 'PAYMENT_RECEIVED' ? formatCurrency(t.amount) : '-',
-        formatCurrency(t.runningBalance !== undefined ? t.runningBalance : t.amount),
-      ]),
+      headers: [],
+      rows: [],
+    },
+    {
+      title: 'TRANSACTION HISTORY (CHRONOLOGICAL LEDGER)',
+      headers: ['Date', 'Transaction Type', 'Description', 'Credit Amount', 'Payment Amount', 'Running Balance'],
+      rows: rows.length > 0 ? rows : [['First Entry', 'Account Creation', 'Initial Account Opening', '-', '-', formatCurrency(0)]],
+    },
+    {
+      title: 'FINAL ACCOUNT LEDGER SUMMARY',
+      summaryCards: [
+        { label: 'Total Credit Given', value: formatCurrency(totalCreditGiven) },
+        { label: 'Total Payments Received', value: formatCurrency(totalPaymentsReceived) },
+        { label: 'Current Outstanding Balance', value: formatCurrency(currentOutstanding) },
+      ],
+      headers: [],
+      rows: [],
     },
   ];
+
+  const sanitized = custName.replace(/[^a-zA-Z0-9]/g, '_');
   generateProfessionalPDF(
-    `Udhaar Ledger Statement - ${customer.customerName || customer.name}`,
-    `Generated on ${new Date().toLocaleDateString()}`,
+    `Credit Customer Statement & Ledger - ${custName}`,
+    `Complete Ledger History | Generated on ${new Date().toLocaleDateString()}`,
     sections,
-    `Udhaar_Ledger_${(customer.customerName || customer.name).replace(/[^a-zA-Z0-9]/g, '_')}`
+    `Credit_Ledger_${sanitized}`
   );
 };

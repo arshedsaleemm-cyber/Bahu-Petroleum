@@ -75,7 +75,6 @@ export const MobileNav: React.FC = () => {
       badgeColor: 'bg-red-600',
       category: 'Fuel Operations',
     },
-    { id: 'daily_petrol_cash', label: 'Daily Petrol Cash', icon: Droplet, category: 'Fuel Operations' },
     { id: 'customers', label: 'Credit Customers (Udhaar)', icon: Users, category: 'Accounts & People' },
     { id: 'workers', label: 'Workers', icon: UserCheck, category: 'Accounts & People' },
     { id: 'attendance', label: 'Attendance', icon: CalendarCheck, category: 'Accounts & People' },
@@ -211,7 +210,7 @@ export const MobileNav: React.FC = () => {
         {[
           { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
           { id: 'deliveries', label: 'Deliveries', icon: Truck },
-          { id: 'daily_petrol_cash', label: 'Daily Cash', icon: Droplet },
+          { id: 'fuel_sales', label: 'Fuel Sales', icon: Flame },
           { id: 'reports', label: 'Reports', icon: BarChart3 },
         ].map(tab => {
           const Icon = tab.icon;

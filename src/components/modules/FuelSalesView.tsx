@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FuelType, FuelSale } from '../../types';
+import { DateFilterRange } from '../../utils/pdfGenerator';
+import { exportModulePDF } from '../../utils/moduleReportExporter';
 import {
   Flame,
   Plus,
@@ -17,13 +19,17 @@ import {
   X,
   Gauge,
   ArrowUpRight,
-  Sparkles
+  Sparkles,
+  Download,
+  DollarSign
 } from 'lucide-react';
 
 export const FuelSalesView: React.FC = () => {
+  const appState = useApp();
   const {
     fuelSales,
     tanks,
+    deliveries,
     addFuelSale,
     updateFuelSale,
     deleteFuelSale,
@@ -34,6 +40,22 @@ export const FuelSalesView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<FuelSale | null>(null);
+
+  // PDF Report Modal
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [pdfReportType, setPdfReportType] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
+  const [pdfSelectedMonth, setPdfSelectedMonth] = useState<number>(new Date().getMonth());
+  const [pdfSelectedYear, setPdfSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const handleDownloadPDF = () => {
+    const filterRange: DateFilterRange = {
+      type: pdfReportType,
+      selectedMonth: pdfSelectedMonth,
+      selectedYear: pdfSelectedYear,
+    };
+    exportModulePDF('FUEL_SALES', filterRange, appState);
+    setIsPdfModalOpen(false);
+  };
 
   // Form states
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -51,6 +73,34 @@ export const FuelSalesView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterFuelType, setFilterFuelType] = useState<string>('ALL');
   const [filterMonth, setFilterMonth] = useState<string>('');
+
+  // Calculate weighted average purchase rate per fuel type
+  const getPurchaseRate = (ft: string) => {
+    const ftDeliveries = (deliveries || []).filter(d =>
+      d.fuelType === ft ||
+      (ft === 'Super Petrol' && (d.fuelType as string) === 'Petrol') ||
+      (ft === 'High-Speed Diesel (HSD)' && (d.fuelType as string) === 'Diesel')
+    );
+    const totalLiters = ftDeliveries.reduce((sum, d) => sum + (d.totalLitersReceived || d.petrolLiters || d.dieselLiters || 0), 0);
+    const totalCost = ftDeliveries.reduce((sum, d) => sum + (d.totalPurchaseAmount || 0), 0);
+    if (totalLiters > 0 && totalCost > 0) return totalCost / totalLiters;
+    if (ftDeliveries.length > 0) {
+      const last = ftDeliveries[ftDeliveries.length - 1];
+      if (ft === 'Super Petrol' && last.purchaseRatePetrol) return last.purchaseRatePetrol;
+      if (ft === 'High-Speed Diesel (HSD)' && last.purchaseRateDiesel) return last.purchaseRateDiesel;
+      if (last.fuelRate) return last.fuelRate;
+    }
+    if (ft === 'Super Petrol') return 250;
+    if (ft === 'High-Speed Diesel (HSD)') return 260;
+    if (ft === 'Excellium High-Octane') return 280;
+    return 250;
+  };
+
+  const purchaseRates: Record<string, number> = useMemo(() => ({
+    'Super Petrol': getPurchaseRate('Super Petrol'),
+    'High-Speed Diesel (HSD)': getPurchaseRate('High-Speed Diesel (HSD)'),
+    'Excellium High-Octane': getPurchaseRate('Excellium High-Octane'),
+  }), [deliveries]);
 
   // Available tanks matching selected fuel type
   const availableTanks = useMemo(() => {
@@ -239,13 +289,22 @@ export const FuelSalesView: React.FC = () => {
             </p>
           </div>
 
-          <button
-            onClick={openAddModal}
-            className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-sm shadow-lg shadow-red-900/30 transition-all hover:scale-[1.02] active:scale-95 shrink-0"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Record Fuel Sale
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={() => setIsPdfModalOpen(true)}
+              className="inline-flex items-center justify-center px-4 py-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-white font-bold text-sm border border-slate-700 shadow-md transition-all hover:scale-[1.02] active:scale-95"
+            >
+              <Download className="w-5 h-5 mr-2 text-red-400" />
+              Download PDF Report
+            </button>
+            <button
+              onClick={openAddModal}
+              className="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-sm shadow-lg shadow-red-900/30 transition-all hover:scale-[1.02] active:scale-95"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Record Fuel Sale
+            </button>
+          </div>
         </div>
       </div>
 
@@ -315,6 +374,44 @@ export const FuelSalesView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Automated Profitability Metrics Row */}
+      {(() => {
+        const monthCost = monthSales.reduce((sum, s) => sum + (s.quantityLiters * (purchaseRates[s.fuelType] || 250)), 0);
+        const monthProfit = monthAmount - monthCost;
+        const avgSellPrice = monthLiters > 0 ? (monthAmount / monthLiters).toFixed(2) : '0';
+        const profitPerLiter = monthLiters > 0 ? (monthProfit / monthLiters).toFixed(2) : '0';
+
+        return (
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-5 text-white shadow-md border border-slate-700/80">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/60">
+              <h3 className="font-bold text-sm tracking-wide text-slate-200 flex items-center">
+                <DollarSign className="w-4 h-4 mr-2 text-emerald-400" />
+                Monthly Fuel Sales Financials & Automated Profit Margins
+              </h3>
+              <span className="text-xs text-slate-400">Calculated from actual stock delivery rates</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/50">
+                <span className="text-[11px] text-slate-400 font-semibold uppercase block mb-1">Total Purchase Cost</span>
+                <span className="text-lg font-black text-slate-200">Rs. {Math.round(monthCost).toLocaleString()}</span>
+              </div>
+              <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/50">
+                <span className="text-[11px] text-slate-400 font-semibold uppercase block mb-1">Gross Profit</span>
+                <span className="text-lg font-black text-emerald-400">Rs. {Math.round(monthProfit).toLocaleString()}</span>
+              </div>
+              <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/50">
+                <span className="text-[11px] text-slate-400 font-semibold uppercase block mb-1">Avg Selling Price / L</span>
+                <span className="text-lg font-black text-blue-400">Rs. {avgSellPrice}</span>
+              </div>
+              <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/50">
+                <span className="text-[11px] text-slate-400 font-semibold uppercase block mb-1">Profit / Litre</span>
+                <span className="text-lg font-black text-emerald-300">Rs. {profitPerLiter} / L</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Fuel Type-wise Stock & Sales Breakdown Cards */}
       <div>
@@ -725,6 +822,110 @@ export const FuelSalesView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Download PDF Report Modal */}
+      {isPdfModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center space-x-2">
+                <span className="p-2 bg-red-100 text-red-700 rounded-xl">
+                  <Download className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Generate Fuel Sales PDF</h3>
+                  <p className="text-xs text-slate-500">Official Bahu Petroleum Fuel Report</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPdfModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-2">Report Frequency Range</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPdfReportType('MONTHLY')}
+                    className={`py-2.5 px-3 rounded-xl border text-center font-bold transition-all ${
+                      pdfReportType === 'MONTHLY'
+                        ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-200'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Monthly Report
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPdfReportType('YEARLY')}
+                    className={`py-2.5 px-3 rounded-xl border text-center font-bold transition-all ${
+                      pdfReportType === 'YEARLY'
+                        ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-200'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Yearly Report
+                  </button>
+                </div>
+              </div>
+
+              {pdfReportType === 'MONTHLY' && (
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Select Month</label>
+                  <select
+                    value={pdfSelectedMonth}
+                    onChange={(e) => setPdfSelectedMonth(parseInt(e.target.value))}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-red-500 focus:outline-none text-slate-900 font-medium"
+                  >
+                    {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m, idx) => (
+                      <option key={m} value={idx}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Select Year</label>
+                <select
+                  value={pdfSelectedYear}
+                  onChange={(e) => setPdfSelectedYear(parseInt(e.target.value))}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-red-500 focus:outline-none text-slate-900 font-medium"
+                >
+                  {[2024, 2025, 2026, 2027].map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-600 text-[11px] leading-relaxed">
+                📄 The generated PDF includes complete company branding, Fuel Sales entry details, Total Litres Sold, Sales Revenue, Purchase Cost, Gross Profit, Fuel Type breakdown, and Tank-wise breakdown.
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsPdfModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadPDF}
+                  className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-900/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Generate PDF
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

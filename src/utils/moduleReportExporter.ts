@@ -81,61 +81,26 @@ export const exportModulePDF = (
 
     case 'FUEL_SALES': {
       const fuelSales = (appState.fuelSales || []).filter((s: any) => isDateInRange(s.date, range));
-      const deliveries = appState.deliveries || [];
 
-      // Calculate weighted average purchase rate per fuel type
-      const getPurchaseRate = (ft: string) => {
-        const ftDeliveries = deliveries.filter((d: any) =>
-          d.fuelType === ft ||
-          (ft === 'Super Petrol' && d.fuelType === 'Petrol') ||
-          (ft === 'High-Speed Diesel (HSD)' && d.fuelType === 'Diesel')
-        );
-        const totalLiters = ftDeliveries.reduce((sum: number, d: any) => sum + (d.totalLitersReceived || d.petrolLiters || d.dieselLiters || 0), 0);
-        const totalCost = ftDeliveries.reduce((sum: number, d: any) => sum + (d.totalPurchaseAmount || 0), 0);
-        if (totalLiters > 0 && totalCost > 0) return totalCost / totalLiters;
-        if (ftDeliveries.length > 0) {
-          const last = ftDeliveries[ftDeliveries.length - 1];
-          if (ft === 'Super Petrol' && last.purchaseRatePetrol) return last.purchaseRatePetrol;
-          if (ft === 'High-Speed Diesel (HSD)' && last.purchaseRateDiesel) return last.purchaseRateDiesel;
-          if (last.fuelRate) return last.fuelRate;
-        }
-        if (ft === 'Super Petrol') return 250;
-        if (ft === 'High-Speed Diesel (HSD)') return 260;
-        if (ft === 'Excellium High-Octane') return 280;
-        return 250;
-      };
+      const superPetrolSales = fuelSales.filter((s: any) => s.fuelType === 'Super Petrol');
+      const superPetrolLiters = superPetrolSales.reduce((a: number, b: any) => a + (b.quantityLiters || 0), 0);
+      const superPetrolRev = superPetrolSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
 
-      const purchaseRates: Record<string, number> = {
-        'Super Petrol': getPurchaseRate('Super Petrol'),
-        'High-Speed Diesel (HSD)': getPurchaseRate('High-Speed Diesel (HSD)'),
-        'Excellium High-Octane': getPurchaseRate('Excellium High-Octane'),
-      };
+      const hsdSales = fuelSales.filter((s: any) => s.fuelType === 'High-Speed Diesel (HSD)');
+      const hsdLiters = hsdSales.reduce((a: number, b: any) => a + (b.quantityLiters || 0), 0);
+      const hsdRev = hsdSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
 
-      const totalLiters = fuelSales.reduce((sum: number, s: any) => sum + (s.quantityLiters || 0), 0);
-      const totalFuelSalesAmt = fuelSales.reduce((sum: number, s: any) => sum + (s.totalSaleAmount || 0), 0);
-      const totalPurchaseCost = fuelSales.reduce((sum: number, s: any) => {
-        const rate = purchaseRates[s.fuelType] || 250;
-        return sum + ((s.quantityLiters || 0) * rate);
-      }, 0);
-      const grossProfit = totalFuelSalesAmt - totalPurchaseCost;
+      const excelliumSales = fuelSales.filter((s: any) => s.fuelType === 'Excellium High-Octane');
+      const excelliumLiters = excelliumSales.reduce((a: number, b: any) => a + (b.quantityLiters || 0), 0);
+      const excelliumRev = excelliumSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
 
-      // Fuel type breakdown
-      const fuelTypes = ['Super Petrol', 'High-Speed Diesel (HSD)', 'Excellium High-Octane'];
-      const fuelTypeRows = fuelTypes.map(ft => {
-        const ftSales = fuelSales.filter((s: any) => s.fuelType === ft);
-        const ltrs = ftSales.reduce((a: number, b: any) => a + (b.quantityLiters || 0), 0);
-        const rev = ftSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
-        const rate = purchaseRates[ft] || 250;
-        const cost = ltrs * rate;
-        const profit = rev - cost;
-        const avgPrice = ltrs > 0 ? (rev / ltrs).toFixed(2) : '-';
-        return [ft, formatLiters(ltrs), avgPrice !== '-' ? `PKR ${avgPrice}` : '-', formatCurrency(rev), formatCurrency(cost), formatCurrency(profit)];
-      });
+      const totalLiters = superPetrolLiters + hsdLiters + excelliumLiters;
+      const totalFuelSalesAmt = superPetrolRev + hsdRev + excelliumRev;
 
       // Tank-wise breakdown
       const tankMap: Record<string, { tankName: string; fuelType: string; liters: number; amount: number }> = {};
       fuelSales.forEach((s: any) => {
-        const tName = s.tankName || 'Tank ' + s.tankId;
+        const tName = s.tankName || 'Tank ' + (s.tankId || '');
         if (!tankMap[tName]) {
           tankMap[tName] = { tankName: tName, fuelType: s.fuelType, liters: 0, amount: 0 };
         }
@@ -152,34 +117,53 @@ export const exportModulePDF = (
 
       const sections: PDFSection[] = [
         {
-          title: 'Fuel Sales Records Log',
+          title: 'Fuel Sales Business Revenue Overview',
           summaryCards: [
-            { label: 'Total Litres Sold', value: formatLiters(totalLiters) },
-            { label: 'Total Sales Revenue', value: formatCurrency(totalFuelSalesAmt) },
-            { label: 'Total Purchase Cost', value: formatCurrency(totalPurchaseCost) },
-            { label: 'Gross Profit', value: formatCurrency(grossProfit) },
+            { label: 'Total Super Petrol Sales', value: formatCurrency(superPetrolRev) },
+            { label: 'Total High-Speed Diesel (HSD) Sales', value: formatCurrency(hsdRev) },
+            { label: 'Total Excellium High-Octane Sales', value: formatCurrency(excelliumRev) },
+            { label: 'Total Fuel Sales Revenue', value: formatCurrency(totalFuelSalesAmt) },
           ],
-          headers: ['Date', 'Fuel Type', 'Tank Name', 'Quantity Sold (L)', 'Selling Price/L', 'Total Sale Amount (PKR)'],
+          headers: ['Date', 'Fuel Type', 'Tank Name', 'Quantity Sold (L)', 'Total Sale Amount (PKR)'],
           rows: fuelSales.length > 0
             ? fuelSales.map((s: any) => [
-                s.date,
+                formatDate(s.date),
                 s.fuelType,
                 s.tankName || 'Tank',
-                formatLiters(s.quantityLiters),
-                s.sellingPricePerLiter ? `PKR ${s.sellingPricePerLiter}` : '-',
-                formatCurrency(s.totalSaleAmount),
+                formatLiters(s.quantityLiters || 0),
+                formatCurrency(s.totalSaleAmount || 0),
               ])
-            : [['No Fuel Sales Records', '-', '-', '0 L', '-', 'PKR 0']],
+            : [['No Fuel Sales Records', '-', '-', '0 L', 'PKR 0']],
         },
         {
-          title: 'Fuel Type-wise Summary',
-          headers: ['Fuel Type', 'Quantity Sold (L)', 'Avg Sale Price/L', 'Sales Revenue', 'Est. Purchase Cost', 'Gross Profit'],
-          rows: fuelTypeRows,
+          title: 'Fuel Type-wise Revenue Summary',
+          headers: ['Fuel Category', 'Litres Sold (Supporting Info)', 'Total Sales Revenue (PKR)'],
+          rows: [
+            ['Super Petrol Sales', formatLiters(superPetrolLiters), formatCurrency(superPetrolRev)],
+            ['High-Speed Diesel (HSD) Sales', formatLiters(hsdLiters), formatCurrency(hsdRev)],
+            ['Excellium High-Octane Sales', formatLiters(excelliumLiters), formatCurrency(excelliumRev)],
+          ],
         },
         {
           title: 'Tank-wise Summary Breakdown',
-          headers: ['Tank Name', 'Fuel Type', 'Total Litres Sold', 'Total Sales Revenue'],
+          headers: ['Tank Name', 'Fuel Type', 'Total Litres Sold', 'Total Sales Revenue (PKR)'],
           rows: tankRows.length > 0 ? tankRows : [['No Tank Data', '-', '0 L', 'PKR 0']],
+        },
+        {
+          title: 'MONTHLY FUEL SALES SUMMARY',
+          summaryCards: [
+            { label: 'Super Petrol Sales', value: formatCurrency(superPetrolRev) },
+            { label: 'High-Speed Diesel Sales', value: formatCurrency(hsdRev) },
+            { label: 'Excellium High-Octane Sales', value: formatCurrency(excelliumRev) },
+            { label: 'Total Monthly Fuel Sales', value: formatCurrency(totalFuelSalesAmt) },
+          ],
+          headers: ['Fuel Stream', 'Volume Sold', 'Total Monthly Sales (PKR)'],
+          rows: [
+            ['Super Petrol Sales', formatLiters(superPetrolLiters), formatCurrency(superPetrolRev)],
+            ['High-Speed Diesel Sales', formatLiters(hsdLiters), formatCurrency(hsdRev)],
+            ['Excellium High-Octane Sales', formatLiters(excelliumLiters), formatCurrency(excelliumRev)],
+            ['TOTAL MONTHLY FUEL SALES', formatLiters(totalLiters), formatCurrency(totalFuelSalesAmt)],
+          ],
         },
       ];
 
@@ -753,82 +737,366 @@ export const exportModulePDF = (
     }
 
     case 'COMPLETE_BUSINESS': {
-      // Complete Grand Monthly Master Report!
+      // Complete Grand Monthly Business Master Report - Bahu Petroleum Enterprise
+      
+      // 1. FUEL SALES & DELIVERIES
       const fuelSales = (appState.fuelSales || []).filter((s: any) => isDateInRange(s.date, range));
-      const fuelRev = fuelSales.reduce((s: number, e: any) => s + (e.totalSaleAmount || 0), 0);
+      const superPetrolSales = fuelSales.filter((s: any) => s.fuelType === 'Super Petrol');
+      const superPetrolLiters = superPetrolSales.reduce((a: number, b: any) => a + (b.quantityLiters || 0), 0);
+      const superPetrolRev = superPetrolSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
+
+      const hsdSales = fuelSales.filter((s: any) => s.fuelType === 'High-Speed Diesel (HSD)');
+      const hsdLiters = hsdSales.reduce((a: number, b: any) => a + (b.quantityLiters || 0), 0);
+      const hsdRev = hsdSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
+
+      const excelliumSales = fuelSales.filter((s: any) => s.fuelType === 'Excellium High-Octane');
+      const excelliumLiters = excelliumSales.reduce((a: number, b: any) => a + (b.quantityLiters || 0), 0);
+      const excelliumRev = excelliumSales.reduce((a: number, b: any) => a + (b.totalSaleAmount || 0), 0);
+
+      const totalFuelLiters = superPetrolLiters + hsdLiters + excelliumLiters;
+      const totalFuelRev = superPetrolRev + hsdRev + excelliumRev;
 
       const deliveries = (appState.deliveries || []).filter((d: any) => isDateInRange(d.deliveryDate, range));
-      const deliveryCost = deliveries.reduce((s: number, d: any) => s + (d.totalPurchaseAmount || 0), 0);
+      const totalFuelDeliveredLiters = deliveries.reduce((s: number, d: any) => s + (d.totalLitersReceived || (d.petrolLiters || 0) + (d.dieselLiters || 0) || 0), 0);
+      const fuelPurchaseCost = deliveries.reduce((s: number, d: any) => s + (d.totalPurchaseAmount || 0), 0);
+      const fuelGrossProfit = totalFuelRev - fuelPurchaseCost;
 
-      const expenses = (appState.expenses || []).filter((ex: any) => isDateInRange(ex.date, range));
-      const expAmt = expenses.reduce((s: number, ex: any) => s + (ex.amount || 0), 0);
+      // 2. TANKS
+      const tanks = appState.tanks || [];
+      const totalTankCapacity = tanks.reduce((s: number, t: any) => s + (t.capacity || 0), 0);
+      const totalCurrentTankStock = tanks.reduce((s: number, t: any) => s + (t.currentFuel || 0), 0);
 
+      // 3. LUBRICANTS
+      const lubricants = appState.lubricants || [];
+      const lubeSalesEntries = (appState.dailySalesEntries || []).filter((s: any) => s.section === 'Lubricants' && isDateInRange(s.date, range));
+      const lubeDirectRev = lubeSalesEntries.reduce((s: number, e: any) => s + (e.totalSales || 0), 0);
+      const lubeStockSoldQty = lubricants.reduce((s: number, l: any) => s + Math.max(0, (l.stockIn || 0) - (l.remainingStock || 0)), 0);
+      const lubeRev = lubeDirectRev || lubricants.reduce((s: number, l: any) => s + (Math.max(0, (l.stockIn || 0) - (l.remainingStock || 0)) * (l.sellingPrice || 0)), 0);
+      const lubeCount = lubeSalesEntries.length || lubeStockSoldQty;
+
+      // 4. TIRE SHOP
+      const tyreServices = (appState.tyreShopServices || []).filter((t: any) => isDateInRange(t.dateTime?.slice(0, 10), range));
+      const tyreDirectEntries = (appState.dailySalesEntries || []).filter((s: any) => s.section === 'Tyre Shop' && isDateInRange(s.date, range));
+      const tyreRev = tyreServices.reduce((s: number, t: any) => s + (t.serviceCost || 0), 0) + tyreDirectEntries.reduce((s: number, e: any) => s + (e.totalSales || 0), 0);
+      const tyreCount = tyreServices.length + tyreDirectEntries.length;
+
+      // 5. TUCK SHOP
+      const tuckItems = appState.tuckShopItems || [];
+      const tuckDirectEntries = (appState.dailySalesEntries || []).filter((s: any) => s.section === 'Tuck Shop' && isDateInRange(s.date, range));
+      const tuckRev = tuckDirectEntries.reduce((s: number, e: any) => s + (e.totalSales || 0), 0) || tuckItems.reduce((s: number, t: any) => s + ((t.stockQty || 0) * (t.salePrice || 0)), 0);
+      const tuckCount = tuckDirectEntries.length || tuckItems.length;
+
+      // 6. CAR WASH
+      const washServices = (appState.carWashServices || []).filter((c: any) => isDateInRange(c.dateTime?.slice(0, 10), range));
+      const washDirectEntries = (appState.dailySalesEntries || []).filter((s: any) => s.section === 'Car Wash' && isDateInRange(s.date, range));
+      const carWashRev = washServices.reduce((s: number, c: any) => s + (c.serviceFee || 0), 0) + washDirectEntries.reduce((s: number, e: any) => s + (e.totalSales || 0), 0);
+      const washCount = washServices.length + washDirectEntries.length;
+
+      // 7. RESTAURANT
+      const restSales = (appState.restaurantSales || []).filter((r: any) => isDateInRange(r.date, range));
+      const restDirectEntries = (appState.dailySalesEntries || []).filter((s: any) => s.section === 'Fast Food' && isDateInRange(s.date, range));
+      const restaurantRev = restSales.reduce((s: number, r: any) => s + (r.netAmount || 0), 0) + restDirectEntries.reduce((s: number, e: any) => s + (e.totalSales || 0), 0);
+      const restaurantCount = restSales.length + restDirectEntries.length;
+
+      // 8. CREDIT CARDS & INFINITY CARDS
       const ccSales = (appState.creditCardSales || []).filter((c: any) => isDateInRange(c.date, range));
-      const ccAmt = ccSales.reduce((s: number, c: any) => s + (c.amount || 0), 0);
+      const ccDirectEntries = (appState.dailySalesEntries || []).filter((s: any) => s.section === 'Credit Card' && isDateInRange(s.date, range));
+      const creditCardRev = ccSales.reduce((s: number, c: any) => s + (c.amount || 0), 0) + ccDirectEntries.reduce((s: number, e: any) => s + (e.totalSales || 0), 0);
+      const ccCount = ccSales.length + ccDirectEntries.length;
 
       const infiniSales = (appState.infiniCardSales || []).filter((i: any) => isDateInRange(i.date, range));
-      const infiniAmt = infiniSales.reduce((s: number, i: any) => s + (i.amount || 0), 0);
+      const infiniDirectEntries = (appState.dailySalesEntries || []).filter((s: any) => s.section === 'Infinity Card' && isDateInRange(s.date, range));
+      const infiniCardRev = infiniSales.reduce((s: number, i: any) => s + (i.amount || 0), 0) + infiniDirectEntries.reduce((s: number, e: any) => s + (e.totalSales || 0), 0);
+      const infiniCount = infiniSales.length + infiniDirectEntries.length;
 
-      const washes = (appState.carWashServices || []).filter((c: any) => isDateInRange(c.dateTime?.slice(0, 10), range));
-      const washAmt = washes.reduce((s: number, c: any) => s + (c.serviceFee || 0), 0);
+      // 9. BANK ACCOUNTS
+      const bankAccounts = appState.bankAccounts || [];
+      const bankTxs = (appState.bankTransactions || []).filter((t: any) => isDateInRange(t.date, range));
+      const totalDeposits = bankTxs.filter((t: any) => t.type === 'Deposit').reduce((s: number, t: any) => s + (t.amount || 0), 0);
+      const totalWithdrawals = bankTxs.filter((t: any) => t.type === 'Withdrawal').reduce((s: number, t: any) => s + (t.amount || 0), 0);
+      const totalBankBalance = bankAccounts.reduce((s: number, b: any) => s + (b.currentBalance || 0), 0);
 
-      const tyres = (appState.tyreShopServices || []).filter((t: any) => isDateInRange(t.dateTime?.slice(0, 10), range));
-      const tyreAmt = tyres.reduce((s: number, t: any) => s + (t.serviceCost || 0), 0);
+      // 10. CREDIT CUSTOMERS (UDHAAR)
+      const udhaarCustomers = appState.udhaarCustomers || [];
+      const totalUdhaarGiven = udhaarCustomers.reduce((s: number, c: any) => s + (c.totalCredit || 0), 0);
+      const totalUdhaarReceived = udhaarCustomers.reduce((s: number, c: any) => s + (c.paymentReceived || 0), 0);
+      const totalUdhaarOutstanding = udhaarCustomers.reduce((s: number, c: any) => s + (c.remainingBalance || 0), 0);
 
-      const restaurantSales = (appState.restaurantSales || []).filter((r: any) => isDateInRange(r.date, range));
-      const restAmt = restaurantSales.reduce((s: number, r: any) => s + (r.netAmount || 0), 0);
+      // Udhaar Transactions Log
+      const allUdhaarTxs: any[] = [];
+      udhaarCustomers.forEach((c: any) => {
+        const cName = c.customerName || c.name || 'Customer';
+        (c.transactions || []).forEach((t: any) => {
+          if (isDateInRange(t.date, range)) {
+            allUdhaarTxs.push({ ...t, customerName: cName });
+          }
+        });
+      });
+      allUdhaarTxs.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
-      const totalGrandRevenue = fuelRev + ccAmt + infiniAmt + washAmt + tyreAmt + restAmt;
-      const netGrandProfit = totalGrandRevenue - deliveryCost - expAmt;
+      // 11. EXPENSES & CATEGORY BREAKDOWN
+      const expenses = (appState.expenses || []).filter((e: any) => isDateInRange(e.date, range));
+      const operatingExpensesAmt = expenses.reduce((s: number, e: any) => s + (e.amount || 0), 0);
+      
+      const categoryMap: Record<string, { count: number; total: number }> = {};
+      // Initialize standard categories
+      ['Water', 'Electricity', 'Maintenance', 'Salaries', 'Fuel Purchase', 'Other Expenses'].forEach(cat => {
+        categoryMap[cat] = { count: 0, total: 0 };
+      });
+
+      // Add fuel purchase as category
+      if (fuelPurchaseCost > 0) {
+        categoryMap['Fuel Purchase'] = { count: deliveries.length, total: fuelPurchaseCost };
+      }
+
+      // Add operating expenses
+      expenses.forEach((e: any) => {
+        const cat = e.category || 'Other Expenses';
+        if (!categoryMap[cat]) categoryMap[cat] = { count: 0, total: 0 };
+        categoryMap[cat].count += 1;
+        categoryMap[cat].total += e.amount || 0;
+      });
+
+      // Worker salaries paid
+      const workers = appState.workers || [];
+      const salaries = appState.salaries || [];
+      const totalSalariesPaid = salaries.reduce((s: number, sal: any) => s + (sal.salaryPaid || 0), 0);
+      if (totalSalariesPaid > 0) {
+        categoryMap['Salaries'].count += salaries.length || workers.length;
+        categoryMap['Salaries'].total += totalSalariesPaid;
+      }
+
+      const totalExpensesAll = Object.values(categoryMap).reduce((s, c) => s + c.total, 0);
+
+      // 12. EMPLOYEES & ATTENDANCE
+      const attendance = appState.attendance || [];
+      const employeeRows = workers.map((w: any) => {
+        const sal = salaries.find((s: any) => s.workerId === w.id);
+        const wAtt = attendance.filter((a: any) => a.workerId === w.id && isDateInRange(a.date, range));
+        const pCount = wAtt.filter((a: any) => a.status === 'Present').length;
+        const aCount = wAtt.filter((a: any) => a.status === 'Absent').length;
+        const lCount = wAtt.filter((a: any) => a.status === 'Leave').length;
+        const hdCount = wAtt.filter((a: any) => a.status === 'Half Day').length;
+
+        const attSummary = wAtt.length > 0
+          ? `${pCount} P / ${aCount} A / ${lCount} L${hdCount > 0 ? ` / ${hdCount} HD` : ''}`
+          : 'No logs recorded';
+
+        const mSal = w.monthlySalary || sal?.monthlySalary || 0;
+        const adv = sal?.totalAdvance || 0;
+        const paid = sal?.salaryPaid || 0;
+        const pending = sal?.pendingSalary !== undefined ? sal.pendingSalary : Math.max(0, mSal - paid);
+
+        return [
+          w.name,
+          formatCurrency(mSal),
+          formatCurrency(adv),
+          formatCurrency(paid),
+          formatCurrency(pending),
+          attSummary,
+        ];
+      });
+
+      // 13. TOTAL BUSINESS INCOME & EXPENSES & PROFIT/LOSS
+      const totalBusinessIncome = totalFuelRev + lubeRev + tyreRev + tuckRev + carWashRev + restaurantRev + creditCardRev + infiniCardRev;
+      const totalBusinessExpenses = totalExpensesAll;
+      const netProfit = totalBusinessIncome - totalBusinessExpenses;
 
       const sections: PDFSection[] = [
         {
-          title: 'Executive Financial Summary',
+          title: 'EXECUTIVE DASHBOARD FINANCIAL SUMMARY',
           summaryCards: [
-            { label: 'Total Enterprise Revenue', value: formatCurrency(totalGrandRevenue) },
-            { label: 'Fuel Purchases Outflow', value: formatCurrency(deliveryCost) },
-            { label: 'Operating Expenses', value: formatCurrency(expAmt) },
-            { label: 'Net Profit', value: formatCurrency(netGrandProfit) },
+            { label: 'Total Business Income', value: formatCurrency(totalBusinessIncome) },
+            { label: 'Total Business Expenses', value: formatCurrency(totalBusinessExpenses) },
+            { label: 'Total Net Profit', value: netProfit >= 0 ? formatCurrency(netProfit) : 'PKR 0' },
+            { label: 'Total Net Loss', value: netProfit < 0 ? formatCurrency(Math.abs(netProfit)) : 'PKR 0' },
           ],
-          headers: ['Business Stream', 'Transactions Count', 'Revenue / Value (PKR)'],
+          headers: ['Revenue Stream', 'Volume / Order Count', 'Total Sales Revenue (PKR)'],
           rows: [
-            ['Fuel Cash Sales', `${fuelSales.length}`, formatCurrency(fuelRev)],
-            ['Fuel Deliveries Received', `${deliveries.length}`, formatCurrency(deliveryCost)],
-            ['Credit Card Terminal Sales', `${ccSales.length}`, formatCurrency(ccAmt)],
-            ['Infini Fleet Card Sales', `${infiniSales.length}`, formatCurrency(infiniAmt)],
-            ['Car Wash Services', `${washes.length}`, formatCurrency(washAmt)],
-            ['Tire Shop Services', `${tyres.length}`, formatCurrency(tyreAmt)],
-            ['Fast Food Restaurant', `${restaurantSales.length}`, formatCurrency(restAmt)],
-            ['Operating Expenses Vouchers', `${expenses.length}`, formatCurrency(expAmt)],
+            ['Fuel Cash Sales', formatLiters(totalFuelLiters), formatCurrency(totalFuelRev)],
+            ['Lubricants & Engine Oils', `${lubeCount} Items / Sales`, formatCurrency(lubeRev)],
+            ['Car Wash Services', `${washCount} Vehicles Washed`, formatCurrency(carWashRev)],
+            ['Tire Shop Services', `${tyreCount} Repair Services`, formatCurrency(tyreRev)],
+            ['Tuck Shop Mart', `${tuckCount} Items / Orders`, formatCurrency(tuckRev)],
+            ['Fast Food Restaurant', `${restaurantCount} Orders Processed`, formatCurrency(restaurantRev)],
+            ['Credit Card Terminal Sales', `${ccCount} POS Receipts`, formatCurrency(creditCardRev)],
+            ['Infinity Fleet Card Sales', `${infiniCount} Fleet Receipts`, formatCurrency(infiniCardRev)],
+            ['TOTAL COMBINED REVENUE', '-', formatCurrency(totalBusinessIncome)],
           ],
         },
         {
-          title: 'Underground Tank Fuel Stock Status',
-          headers: ['Tank Name', 'Fuel Type', 'Capacity', 'Current Fuel', 'Stock %'],
-          rows: (appState.tanks || []).map((t: any) => [
-            t.tankName,
-            t.fuelType,
-            formatLiters(t.capacity),
-            formatLiters(t.currentFuel),
-            `${Math.round((t.currentFuel / t.capacity) * 100)}%`,
+          title: 'FUEL SECTION - DELIVERIES, SALES & GROSS PROFIT',
+          summaryCards: [
+            { label: 'Fuel Sales Revenue', value: formatCurrency(totalFuelRev) },
+            { label: 'Fuel Purchase Cost', value: formatCurrency(fuelPurchaseCost) },
+            { label: 'Fuel Gross Profit', value: formatCurrency(fuelGrossProfit) },
+            { label: 'Total Litres Sold', value: formatLiters(totalFuelLiters) },
+          ],
+          headers: ['Fuel Category', 'Litres Delivered / Sold', 'Purchases / Sales Amount (PKR)'],
+          rows: [
+            ['Super Petrol Sales', formatLiters(superPetrolLiters), formatCurrency(superPetrolRev)],
+            ['High-Speed Diesel (HSD) Sales', formatLiters(hsdLiters), formatCurrency(hsdRev)],
+            ['Excellium High-Octane Sales', formatLiters(excelliumLiters), formatCurrency(excelliumRev)],
+            ['Fuel Tanker Purchases Outflow', formatLiters(totalFuelDeliveredLiters), `- ${formatCurrency(fuelPurchaseCost)}`],
+            ['NET FUEL GROSS PROFIT', formatLiters(totalFuelLiters), formatCurrency(fuelGrossProfit)],
+          ],
+        },
+        {
+          title: 'UNDERGROUND TANK STORAGE & REMAINING STOCK',
+          summaryCards: [
+            { label: 'Total Fuel Tanks', value: `${tanks.length} Underground Tanks` },
+            { label: 'Total Tank Capacity', value: formatLiters(totalTankCapacity) },
+            { label: 'Current Tank Stock', value: formatLiters(totalCurrentTankStock) },
+            { label: 'Remaining Tank Stock', value: formatLiters(totalCurrentTankStock) },
+          ],
+          headers: ['Tank Name', 'Fuel Type', 'Capacity', 'Current Fuel Stock', 'Stock Fullness (%)'],
+          rows: tanks.length > 0
+            ? tanks.map((t: any) => [
+                t.tankName || 'Tank',
+                t.fuelType,
+                formatLiters(t.capacity || 0),
+                formatLiters(t.currentFuel || 0),
+                `${Math.round(((t.currentFuel || 0) / (t.capacity || 1)) * 100)}%`,
+              ])
+            : [['No Tank Data', '-', '0 L', '0 L', '0%']],
+        },
+        {
+          title: 'SUB-BUSINESS REVENUE (LUBRICANTS, CAR WASH, TIRE SHOP, TUCK SHOP, RESTAURANT)',
+          headers: ['Business Module', 'Total Sales / Orders Count', 'Total Module Revenue (PKR)'],
+          rows: [
+            ['Lubricants & Engine Oils', `${lubeCount} Sales / Items`, formatCurrency(lubeRev)],
+            ['Tire Repair Shop', `${tyreCount} Services`, formatCurrency(tyreRev)],
+            ['Tuck Shop Mart', `${tuckCount} Items Sold`, formatCurrency(tuckRev)],
+            ['Car Wash Station', `${washCount} Vehicles Washed`, formatCurrency(carWashRev)],
+            ['Fast Food Restaurant', `${restaurantCount} Orders Processed`, formatCurrency(restaurantRev)],
+          ],
+        },
+        {
+          title: 'CREDIT CUSTOMERS (UDHAAR REGISTER) AUDIT',
+          summaryCards: [
+            { label: 'Total Udhaar Accounts', value: `${udhaarCustomers.length}` },
+            { label: 'Total Credit Given', value: formatCurrency(totalUdhaarGiven) },
+            { label: 'Total Payments Received', value: formatCurrency(totalUdhaarReceived) },
+            { label: 'Remaining Outstanding Balance', value: formatCurrency(totalUdhaarOutstanding) },
+          ],
+          headers: ['Customer Name', 'Total Credit Given', 'Total Payments Received', 'Remaining Balance'],
+          rows: udhaarCustomers.length > 0
+            ? udhaarCustomers.map((c: any) => [
+                c.customerName || c.name || 'Customer',
+                formatCurrency(c.totalCredit || 0),
+                formatCurrency(c.paymentReceived || 0),
+                formatCurrency(c.remainingBalance || 0),
+              ])
+            : [['No Udhaar Customers Registered', 'PKR 0', 'PKR 0', 'PKR 0']],
+        },
+        {
+          title: 'CREDIT CUSTOMERS COMPLETE TRANSACTION HISTORY LOG',
+          headers: ['Date', 'Customer Name', 'Type', 'Description', 'Credit Added', 'Payment Received', 'Running Balance'],
+          rows: allUdhaarTxs.length > 0
+            ? allUdhaarTxs.map((t: any) => [
+                formatDate(t.date),
+                t.customerName,
+                t.type === 'CREDIT_PURCHASE' ? 'Credit Added' : 'Payment Received',
+                t.description || (t.type === 'CREDIT_PURCHASE' ? 'Credit Purchase' : 'Payment Received'),
+                t.type === 'CREDIT_PURCHASE' ? formatCurrency(t.amount) : '-',
+                t.type === 'PAYMENT_RECEIVED' ? formatCurrency(t.amount) : '-',
+                formatCurrency(t.runningBalance !== undefined ? t.runningBalance : t.amount),
+              ])
+            : [['No Transactions Recorded', '-', '-', '-', '-', '-', 'PKR 0']],
+        },
+        {
+          title: 'CREDIT CARD & INFINITY FLEET CARD SALES',
+          summaryCards: [
+            { label: 'Credit Card Sales', value: formatCurrency(creditCardRev) },
+            { label: 'Infini Fleet Card Sales', value: formatCurrency(infiniCardRev) },
+          ],
+          headers: ['Card Type / Terminal', 'Total Monthly Transactions', 'Total Sales Amount (PKR)'],
+          rows: [
+            ['Credit Card POS Terminal', `${ccCount} Transactions`, formatCurrency(creditCardRev)],
+            ['Infinity Fleet Card', `${infiniCount} Transactions`, formatCurrency(infiniCardRev)],
+          ],
+        },
+        {
+          title: 'BANK ACCOUNTS & TRANSACTIONS STATEMENT',
+          summaryCards: [
+            { label: 'Total Deposits', value: formatCurrency(totalDeposits) },
+            { label: 'Total Withdrawals', value: formatCurrency(totalWithdrawals) },
+            { label: 'Combined Bank Balance', value: formatCurrency(totalBankBalance) },
+          ],
+          headers: ['Bank Name', 'Account Title / Number', 'Deposits (PKR)', 'Withdrawals (PKR)', 'Closing Balance (PKR)'],
+          rows: bankAccounts.length > 0
+            ? bankAccounts.map((b: any) => {
+                const bTxs = bankTxs.filter((t: any) => t.bankId === b.id || t.bankName === b.bankName);
+                const dep = bTxs.filter((t: any) => t.type === 'Deposit').reduce((s: number, t: any) => s + (t.amount || 0), 0);
+                const wd = bTxs.filter((t: any) => t.type === 'Withdrawal').reduce((s: number, t: any) => s + (t.amount || 0), 0);
+                return [
+                  b.bankName,
+                  `${b.accountTitle || ''} (${b.accountNumber || 'Acc'})`,
+                  formatCurrency(dep),
+                  formatCurrency(wd),
+                  formatCurrency(b.currentBalance || 0),
+                ];
+              })
+            : [['No Bank Accounts Registered', '-', 'PKR 0', 'PKR 0', 'PKR 0']],
+        },
+        {
+          title: 'EXPENSES BY CATEGORY BREAKDOWN',
+          summaryCards: [
+            { label: 'Total Expense Vouchers', value: `${expenses.length}` },
+            { label: 'Overall Expense Total', value: formatCurrency(totalExpensesAll) },
+          ],
+          headers: ['Expense Category', 'Voucher / Log Count', 'Category Total (PKR)'],
+          rows: Object.entries(categoryMap).map(([cat, val]) => [
+            cat,
+            `${val.count} Vouchers`,
+            formatCurrency(val.total),
           ]),
         },
         {
-          title: 'Employee & HR Payroll Overview',
-          headers: ['Worker Name', 'Designation', 'Basic Salary', 'Pending Salary'],
-          rows: (appState.workers || []).map((w: any) => {
-            const sal = (appState.salaries || []).find((s: any) => s.workerId === w.id);
-            return [
-              w.name,
-              w.designation,
-              formatCurrency(w.basicSalary || 0),
-              formatCurrency(sal?.pendingSalary || 0),
-            ];
-          }),
+          title: 'EMPLOYEES PAYROLL & ATTENDANCE SUMMARY',
+          headers: ['Worker Name', 'Monthly Salary', 'Total Advance', 'Salary Paid', 'Pending Salary', 'Monthly Attendance Summary'],
+          rows: employeeRows.length > 0 ? employeeRows : [['No Employees Registered', 'PKR 0', 'PKR 0', 'PKR 0', 'PKR 0', '-']],
+        },
+        {
+          title: 'STATEMENT OF PROFIT AND LOSS',
+          summaryCards: [
+            { label: 'Total Business Income', value: formatCurrency(totalBusinessIncome) },
+            { label: 'Total Business Expenses', value: formatCurrency(totalBusinessExpenses) },
+            { label: 'Net Operating Result', value: netProfit >= 0 ? formatCurrency(netProfit) : `LOSS: ${formatCurrency(Math.abs(netProfit))}` },
+          ],
+          headers: ['Financial Statement Category', 'Amount (PKR)'],
+          rows: [
+            ['Total Business Income', formatCurrency(totalBusinessIncome)],
+            ['Total Business Expenses & Outflows', `- ${formatCurrency(totalBusinessExpenses)}`],
+            [netProfit >= 0 ? 'NET MONTHLY PROFIT' : 'NET MONTHLY LOSS', formatCurrency(netProfit)],
+          ],
+        },
+        {
+          title: 'FINAL CONSOLIDATED MONTHLY BUSINESS SUMMARY',
+          summaryCards: [
+            { label: 'Total Fuel Sold', value: formatLiters(totalFuelLiters) },
+            { label: 'Total Fuel Purchased', value: formatCurrency(fuelPurchaseCost) },
+            { label: 'Total Credit Outstanding', value: formatCurrency(totalUdhaarOutstanding) },
+            { label: 'Net Monthly Profit / Loss', value: formatCurrency(netProfit) },
+          ],
+          headers: ['Summary Metric Category', 'Volume / Status Details', 'Consolidated Total (PKR)'],
+          rows: [
+            ['Total Fuel Sold', formatLiters(totalFuelLiters), formatCurrency(totalFuelRev)],
+            ['Total Fuel Purchased', `${deliveries.length} Tankers Received`, formatCurrency(fuelPurchaseCost)],
+            ['Total Lubricant Sales', `${lubeCount} Items Sold`, formatCurrency(lubeRev)],
+            ['Total Tire Shop Sales', `${tyreCount} Services Logged`, formatCurrency(tyreRev)],
+            ['Total Tuck Shop Sales', `${tuckCount} Items Sold`, formatCurrency(tuckRev)],
+            ['Total Car Wash Sales', `${washCount} Washes Logged`, formatCurrency(carWashRev)],
+            ['Total Restaurant Sales', `${restaurantCount} Orders Processed`, formatCurrency(restaurantRev)],
+            ['Total Credit Outstanding', `${udhaarCustomers.length} Accounts`, formatCurrency(totalUdhaarOutstanding)],
+            ['Total Bank Balance', `${bankAccounts.length} Bank Accounts`, formatCurrency(totalBankBalance)],
+            ['Total Monthly Expenses', `${expenses.length} Vouchers + Purchases + Salaries`, formatCurrency(totalExpensesAll)],
+            [netProfit >= 0 ? 'NET MONTHLY PROFIT' : 'NET MONTHLY LOSS', 'Final Enterprise Result', formatCurrency(netProfit)],
+          ],
         },
       ];
 
-      generateProfessionalPDF('Complete Business Monthly Master Report', label, sections, 'Complete_Business_Monthly');
+      generateProfessionalPDF('Complete Monthly Business Report', label, sections, 'Complete_Monthly_Business_Report');
       break;
     }
 

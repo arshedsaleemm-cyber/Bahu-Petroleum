@@ -85,10 +85,6 @@ export const UdhaarView: React.FC = () => {
   // Open Handlers
   const openAddCustomerModal = () => {
     setCustomerName('');
-    setPhoneNumber('');
-    setVehicleNumber('');
-    setAddress('');
-    setCreditLimit(300000);
     setInitialCredit(0);
     setIsAddCustomerModalOpen(true);
   };
@@ -99,14 +95,14 @@ export const UdhaarView: React.FC = () => {
     setPhoneNumber(cust.phoneNumber || '');
     setVehicleNumber(cust.vehicleNumber || '');
     setAddress(cust.address || '');
-    setCreditLimit(cust.creditLimit || 300000);
+    setCreditLimit(cust.creditLimit || 0);
     setIsEditCustomerModalOpen(true);
   };
 
   const openAddCreditModal = (cust: UdhaarCustomer) => {
     setSelectedCust(cust);
     setCreditAmount(25000);
-    setCreditDesc('Fuel Refill (Diesel / Petrol)');
+    setCreditDesc('Fuel Refill Credit');
     setCreditVehicle(cust.vehicleNumber || '');
     setCreditDate(new Date().toISOString().slice(0, 10));
     setCreditTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -141,17 +137,31 @@ export const UdhaarView: React.FC = () => {
   // Submit Handlers
   const handleAddCustomerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim()) return;
+    const trimmedName = customerName.trim();
+    if (!trimmedName) return;
+
+    // Check if customer with same name already exists
+    const existing = udhaarCustomers.find(
+      c => (c.customerName || c.name || '').toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (existing) {
+      alert(`Customer profile for "${trimmedName}" already exists! Opening existing customer profile.`);
+      setIsAddCustomerModalOpen(false);
+      openAddCreditModal(existing);
+      return;
+    }
+
     addUdhaarCustomer({
-      customerName: customerName.trim(),
-      name: customerName.trim(),
-      phoneNumber: phoneNumber.trim(),
-      vehicleNumber: vehicleNumber.trim(),
-      address: address.trim(),
-      creditLimit: creditLimit || 0,
+      customerName: trimmedName,
+      name: trimmedName,
+      phoneNumber: '',
+      vehicleNumber: '',
+      address: '',
+      creditLimit: 0,
       totalCredit: initialCredit || 0,
       paymentReceived: 0,
-      notes: 'Customer ledger account created',
+      notes: 'Customer account created',
     });
     setIsAddCustomerModalOpen(false);
   };
@@ -269,7 +279,7 @@ export const UdhaarView: React.FC = () => {
             onClick={openAddCustomerModal}
             className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Add Credit Customer Profile
+            <Plus className="w-4 h-4" /> Add Credit Customer
           </button>
         </div>
       </div>
@@ -302,7 +312,7 @@ export const UdhaarView: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search by customer name or mobile number..."
+            placeholder="Search credit customers by full name..."
             className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all"
           />
         </div>
@@ -314,7 +324,7 @@ export const UdhaarView: React.FC = () => {
           <div className="col-span-full bg-white p-8 rounded-2xl border border-slate-200 text-center space-y-2">
             <Users className="w-10 h-10 text-slate-300 mx-auto" />
             <p className="text-sm font-bold text-slate-700">No credit customer accounts found</p>
-            <p className="text-xs text-slate-400">Try searching with a different name or add a new customer ledger.</p>
+            <p className="text-xs text-slate-400">Try searching with a different name or click "Add Credit Customer".</p>
           </div>
         ) : (
           filteredCustomers.map(cust => {
@@ -337,22 +347,26 @@ export const UdhaarView: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
-                      <div className="flex items-center gap-1">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="font-semibold text-slate-700">{cust.phoneNumber || 'N/A'}</span>
+                    {(cust.phoneNumber || cust.vehicleNumber) && (
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
+                        {cust.phoneNumber && (
+                          <div className="flex items-center gap-1">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="font-semibold text-slate-700">{cust.phoneNumber}</span>
+                          </div>
+                        )}
+                        {cust.vehicleNumber && (
+                          <div className="flex items-center gap-1">
+                            <Truck className="w-3.5 h-3.5 text-blue-600" />
+                            <span>{cust.vehicleNumber}</span>
+                          </div>
+                        )}
                       </div>
-                      {cust.vehicleNumber && (
-                        <div className="flex items-center gap-1">
-                          <Truck className="w-3.5 h-3.5 text-blue-600" />
-                          <span>{cust.vehicleNumber}</span>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
 
                   <div className="text-right flex-shrink-0">
-                    <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider">Outstanding Balance</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider">Outstanding Credit</p>
                     <p className={`text-lg font-black ${isOverLimit ? 'text-red-600' : 'text-slate-900'}`}>
                       {formatCurrency(cust.remainingBalance)}
                     </p>
@@ -362,15 +376,15 @@ export const UdhaarView: React.FC = () => {
                 {/* Ledger Financial Summary Bar */}
                 <div className="grid grid-cols-3 gap-2 text-center bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs">
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Credit Limit</p>
-                    <p className="font-bold text-slate-700 mt-0.5">{formatCurrency(cust.creditLimit || 0)}</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Outstanding</p>
+                    <p className="font-black text-slate-900 mt-0.5">{formatCurrency(cust.remainingBalance || 0)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-rose-600 uppercase">Total Credit</p>
+                    <p className="text-[10px] font-bold text-rose-600 uppercase">Total Credit Given</p>
                     <p className="font-bold text-rose-800 mt-0.5">{formatCurrency(cust.totalCredit || 0)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-emerald-600 uppercase">Received</p>
+                    <p className="text-[10px] font-bold text-emerald-600 uppercase">Total Payments Received</p>
                     <p className="font-bold text-emerald-800 mt-0.5">{formatCurrency(cust.paymentReceived || 0)}</p>
                   </div>
                 </div>
@@ -442,14 +456,14 @@ export const UdhaarView: React.FC = () => {
         )}
       </div>
 
-      {/* MODAL 1: Add New Customer Ledger Profile */}
+      {/* MODAL 1: Add New Credit Customer Profile */}
       {isAddCustomerModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
             <div className="bg-red-600 p-4 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5" />
-                <h3 className="font-extrabold text-base">Add New Credit Customer Profile</h3>
+                <h3 className="font-extrabold text-base">Add New Credit Customer</h3>
               </div>
               <button
                 onClick={() => setIsAddCustomerModalOpen(false)}
@@ -461,73 +475,28 @@ export const UdhaarView: React.FC = () => {
 
             <form onSubmit={handleAddCustomerSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Customer / Fleet Name *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Customer Full Name *</label>
                 <input
                   type="text"
                   value={customerName}
                   onChange={e => setCustomerName(e.target.value)}
                   required
-                  placeholder="e.g. Ahmed Ali / Daewoo Express"
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-semibold outline-none focus:border-red-600"
+                  placeholder="Enter customer full name (e.g. Ahmed Ali)"
+                  className="w-full p-3 rounded-2xl border border-slate-300 text-sm font-semibold outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Mobile / Phone Number</label>
-                  <input
-                    type="text"
-                    value={phoneNumber}
-                    onChange={e => setPhoneNumber(e.target.value)}
-                    placeholder="0300-1234567"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-semibold outline-none focus:border-red-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Vehicle Number</label>
-                  <input
-                    type="text"
-                    value={vehicleNumber}
-                    onChange={e => setVehicleNumber(e.target.value)}
-                    placeholder="LES-1022"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-semibold outline-none focus:border-red-600"
-                  />
-                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Address / Terminal Location</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Current Credit Amount (PKR) *</label>
                 <input
-                  type="text"
-                  value={address}
-                  onChange={e => setAddress(e.target.value)}
-                  placeholder="Multan Road, Lahore"
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-medium outline-none focus:border-red-600"
+                  type="number"
+                  value={initialCredit}
+                  onChange={e => setInitialCredit(Number(e.target.value))}
+                  min={0}
+                  required
+                  placeholder="0"
+                  className="w-full p-3 rounded-2xl border border-slate-300 text-sm font-bold text-slate-900 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-100"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Credit Limit (PKR)</label>
-                  <input
-                    type="number"
-                    value={creditLimit}
-                    onChange={e => setCreditLimit(Number(e.target.value))}
-                    min={0}
-                    required
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-red-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Initial Credit Balance (PKR)</label>
-                  <input
-                    type="number"
-                    value={initialCredit}
-                    onChange={e => setInitialCredit(Number(e.target.value))}
-                    min={0}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-red-600"
-                  />
-                </div>
               </div>
 
               <div className="pt-2 flex justify-end gap-2">
@@ -540,9 +509,9 @@ export const UdhaarView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
                 >
-                  Create Customer Ledger
+                  Save Customer
                 </button>
               </div>
             </form>
@@ -569,56 +538,13 @@ export const UdhaarView: React.FC = () => {
 
             <form onSubmit={handleEditCustomerSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Customer / Fleet Name *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Customer Full Name *</label>
                 <input
                   type="text"
                   value={customerName}
                   onChange={e => setCustomerName(e.target.value)}
                   required
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-semibold outline-none focus:border-slate-800"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Mobile / Phone Number</label>
-                  <input
-                    type="text"
-                    value={phoneNumber}
-                    onChange={e => setPhoneNumber(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-semibold outline-none focus:border-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Vehicle Number</label>
-                  <input
-                    type="text"
-                    value={vehicleNumber}
-                    onChange={e => setVehicleNumber(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-semibold outline-none focus:border-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Address / Terminal Location</label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={e => setAddress(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-medium outline-none focus:border-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Credit Limit (PKR)</label>
-                <input
-                  type="number"
-                  value={creditLimit}
-                  onChange={e => setCreditLimit(Number(e.target.value))}
-                  min={0}
-                  required
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold outline-none focus:border-slate-800"
+                  className="w-full p-3 rounded-2xl border border-slate-300 text-sm font-semibold outline-none focus:border-slate-800"
                 />
               </div>
 

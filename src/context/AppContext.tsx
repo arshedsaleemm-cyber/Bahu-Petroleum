@@ -1193,13 +1193,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Udhaar Customers
   const addUdhaarCustomer = (data: Omit<UdhaarCustomer, 'id' | 'remainingBalance' | 'transactions'>) => {
+    const initialAmount = data.totalCredit || 0;
+    const initialTxs: UdhaarTransaction[] = initialAmount > 0 ? [{
+      id: `ut-${Date.now()}`,
+      date: new Date().toISOString().slice(0, 10),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'CREDIT_PURCHASE',
+      amount: initialAmount,
+      description: 'Opening Credit Balance',
+      runningBalance: initialAmount,
+    }] : [];
+
     const newCust: UdhaarCustomer = {
       ...data,
       id: `udh-${Date.now()}`,
-      totalCredit: data.totalCredit || 0,
+      totalCredit: initialAmount,
       paymentReceived: data.paymentReceived || 0,
-      remainingBalance: (data.totalCredit || 0) - (data.paymentReceived || 0),
-      transactions: [],
+      remainingBalance: initialAmount - (data.paymentReceived || 0),
+      transactions: initialTxs,
     };
     setUdhaarCustomers(prev => [...prev, newCust]);
     syncSaveDoc('udhaarCustomers', newCust);

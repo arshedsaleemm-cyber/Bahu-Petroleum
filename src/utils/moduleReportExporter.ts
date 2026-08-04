@@ -97,72 +97,44 @@ export const exportModulePDF = (
       const totalLiters = superPetrolLiters + hsdLiters + excelliumLiters;
       const totalFuelSalesAmt = superPetrolRev + hsdRev + excelliumRev;
 
-      // Tank-wise breakdown
-      const tankMap: Record<string, { tankName: string; fuelType: string; liters: number; amount: number }> = {};
-      fuelSales.forEach((s: any) => {
-        const tName = s.tankName || 'Tank ' + (s.tankId || '');
-        if (!tankMap[tName]) {
-          tankMap[tName] = { tankName: tName, fuelType: s.fuelType, liters: 0, amount: 0 };
-        }
-        tankMap[tName].liters += s.quantityLiters || 0;
-        tankMap[tName].amount += s.totalSaleAmount || 0;
-      });
-
-      const tankRows = Object.values(tankMap).map(t => [
-        t.tankName,
-        t.fuelType,
-        formatLiters(t.liters),
-        formatCurrency(t.amount),
-      ]);
-
       const sections: PDFSection[] = [
         {
-          title: 'Fuel Sales Business Revenue Overview',
+          title: 'Fuel Sales Records Log',
           summaryCards: [
-            { label: 'Total Super Petrol Sales', value: formatCurrency(superPetrolRev) },
-            { label: 'Total High-Speed Diesel (HSD) Sales', value: formatCurrency(hsdRev) },
-            { label: 'Total Excellium High-Octane Sales', value: formatCurrency(excelliumRev) },
+            { label: 'Super Petrol Sales (PKR)', value: formatCurrency(superPetrolRev) },
+            { label: 'High-Speed Diesel Sales (PKR)', value: formatCurrency(hsdRev) },
+            { label: 'Excellium High-Octane Sales (PKR)', value: formatCurrency(excelliumRev) },
             { label: 'Total Fuel Sales Revenue', value: formatCurrency(totalFuelSalesAmt) },
           ],
-          headers: ['Date', 'Fuel Type', 'Tank Name', 'Quantity Sold (L)', 'Total Sale Amount (PKR)'],
+          headers: ['Date', 'Fuel Type', 'Tank', 'Litres Sold', 'Selling Price Per Litre', 'Total Sale Amount'],
           rows: fuelSales.length > 0
-            ? fuelSales.map((s: any) => [
-                formatDate(s.date),
-                s.fuelType,
-                s.tankName || 'Tank',
-                formatLiters(s.quantityLiters || 0),
-                formatCurrency(s.totalSaleAmount || 0),
-              ])
-            : [['No Fuel Sales Records', '-', '-', '0 L', 'PKR 0']],
+            ? fuelSales.map((s: any) => {
+                const price = s.sellingPricePerLiter || s.sellingPrice || s.rate || (s.quantityLiters ? s.totalSaleAmount / s.quantityLiters : 0);
+                return [
+                  formatDate(s.date),
+                  s.fuelType,
+                  s.tankName || `Tank ${s.tankId || 1}`,
+                  formatLiters(s.quantityLiters || 0),
+                  `PKR ${Number(price).toFixed(2)}`,
+                  formatCurrency(s.totalSaleAmount || 0),
+                ];
+              })
+            : [['No Fuel Sales Records', '-', '-', '0 L', 'PKR 0.00', 'PKR 0']],
         },
         {
-          title: 'Fuel Type-wise Revenue Summary',
-          headers: ['Fuel Category', 'Litres Sold (Supporting Info)', 'Total Sales Revenue (PKR)'],
-          rows: [
-            ['Super Petrol Sales', formatLiters(superPetrolLiters), formatCurrency(superPetrolRev)],
-            ['High-Speed Diesel (HSD) Sales', formatLiters(hsdLiters), formatCurrency(hsdRev)],
-            ['Excellium High-Octane Sales', formatLiters(excelliumLiters), formatCurrency(excelliumRev)],
-          ],
-        },
-        {
-          title: 'Tank-wise Summary Breakdown',
-          headers: ['Tank Name', 'Fuel Type', 'Total Litres Sold', 'Total Sales Revenue (PKR)'],
-          rows: tankRows.length > 0 ? tankRows : [['No Tank Data', '-', '0 L', 'PKR 0']],
-        },
-        {
-          title: 'MONTHLY FUEL SALES SUMMARY',
+          title: 'Monthly Summary',
           summaryCards: [
-            { label: 'Super Petrol Sales', value: formatCurrency(superPetrolRev) },
-            { label: 'High-Speed Diesel Sales', value: formatCurrency(hsdRev) },
-            { label: 'Excellium High-Octane Sales', value: formatCurrency(excelliumRev) },
-            { label: 'Total Monthly Fuel Sales', value: formatCurrency(totalFuelSalesAmt) },
+            { label: 'Super Petrol Sales (PKR)', value: formatCurrency(superPetrolRev) },
+            { label: 'High-Speed Diesel Sales (PKR)', value: formatCurrency(hsdRev) },
+            { label: 'Excellium High-Octane Sales (PKR)', value: formatCurrency(excelliumRev) },
+            { label: 'Total Fuel Sales Revenue', value: formatCurrency(totalFuelSalesAmt) },
           ],
-          headers: ['Fuel Stream', 'Volume Sold', 'Total Monthly Sales (PKR)'],
+          headers: ['Fuel Category', 'Litres Sold', 'Total Sales Revenue (PKR)'],
           rows: [
             ['Super Petrol Sales', formatLiters(superPetrolLiters), formatCurrency(superPetrolRev)],
             ['High-Speed Diesel Sales', formatLiters(hsdLiters), formatCurrency(hsdRev)],
             ['Excellium High-Octane Sales', formatLiters(excelliumLiters), formatCurrency(excelliumRev)],
-            ['TOTAL MONTHLY FUEL SALES', formatLiters(totalLiters), formatCurrency(totalFuelSalesAmt)],
+            ['TOTAL FUEL SALES REVENUE', formatLiters(totalLiters), formatCurrency(totalFuelSalesAmt)],
           ],
         },
       ];
@@ -173,66 +145,140 @@ export const exportModulePDF = (
 
     case 'DELIVERIES': {
       const deliveries = (appState.deliveries || []).filter((d: any) => isDateInRange(d.deliveryDate, range));
-      const totalLiters = deliveries.reduce((sum: number, d: any) => sum + (d.totalLitersReceived || 0), 0);
+      
+      const petrolDeliveries = deliveries.filter((d: any) => d.fuelType === 'Super Petrol' || d.fuelType === 'Petrol');
+      const petrolLiters = petrolDeliveries.reduce((sum: number, d: any) => sum + (d.totalLitersReceived || d.petrolLiters || 0), 0);
+      
+      const dieselDeliveries = deliveries.filter((d: any) => d.fuelType === 'High-Speed Diesel (HSD)' || d.fuelType === 'Diesel');
+      const dieselLiters = dieselDeliveries.reduce((sum: number, d: any) => sum + (d.totalLitersReceived || d.dieselLiters || 0), 0);
+      
+      const excelliumDeliveries = deliveries.filter((d: any) => d.fuelType === 'Excellium High-Octane' || d.fuelType === 'High Octane');
+      const excelliumLiters = excelliumDeliveries.reduce((sum: number, d: any) => sum + (d.totalLitersReceived || 0), 0);
+      
       const totalCost = deliveries.reduce((sum: number, d: any) => sum + (d.totalPurchaseAmount || 0), 0);
+
+      // Shortages & Overages
+      const tanks = appState.tanks || [];
+      let totalShortage = 0;
+      let totalOverage = 0;
+
+      const dipRows = tanks.map((t: any) => {
+        const physicalDip = t.currentDipReading || t.currentFuel || 0;
+        const calcStock = t.calculatedStock !== undefined ? t.calculatedStock : t.currentFuel;
+        const diff = physicalDip - calcStock;
+        const shortage = diff < 0 ? Math.abs(diff) : 0;
+        const overage = diff > 0 ? diff : 0;
+        totalShortage += shortage;
+        totalOverage += overage;
+
+        return [
+          t.tankName || 'Tank',
+          formatLiters(physicalDip),
+          formatLiters(calcStock),
+          `${diff >= 0 ? '+' : ''}${formatLiters(diff)}`,
+          formatLiters(shortage),
+          formatLiters(overage),
+        ];
+      });
 
       const sections: PDFSection[] = [
         {
-          title: 'Fuel Tanker Shipments Received Log',
+          title: 'Fuel Delivery Log',
           summaryCards: [
-            { label: 'Total Deliveries', value: `${deliveries.length} Tankers` },
-            { label: 'Total Fuel Received', value: formatLiters(totalLiters) },
-            { label: 'Total Purchase Invoice', value: formatCurrency(totalCost) },
+            { label: 'Total Deliveries Received', value: `${deliveries.length} Tankers` },
+            { label: 'Total Purchase Cost', value: formatCurrency(totalCost) },
           ],
-          headers: ['Date', 'Supplier', 'Invoice #', 'Fuel Type', 'Quantity', 'Fuel Rate', 'Purchase Cost', 'Tank'],
-          rows: deliveries.map((d: any) => {
-            const rate = d.fuelRate || (d.fuelType === 'Petrol' ? d.purchaseRatePetrol : d.purchaseRateDiesel) || (d.totalLitersReceived ? d.totalPurchaseAmount / d.totalLitersReceived : 0);
-            return [
-              d.deliveryDate,
-              d.supplierName,
-              d.invoiceNumber,
-              d.fuelType,
-              formatLiters(d.totalLitersReceived),
-              `PKR ${rate.toFixed(2)}/L`,
-              formatCurrency(d.totalPurchaseAmount),
-              d.tankName || d.destinationTank || 'Tank 1',
-            ];
-          }),
+          headers: ['Delivery Date', 'Fuel Type', 'Tank Name', 'Quantity Received (Litres)', 'Purchase Rate Per Litre', 'Total Purchase Cost'],
+          rows: deliveries.length > 0
+            ? deliveries.map((d: any) => {
+                const rate = d.fuelRate || d.purchaseRate || (d.totalLitersReceived ? d.totalPurchaseAmount / d.totalLitersReceived : 0);
+                return [
+                  formatDate(d.deliveryDate),
+                  d.fuelType,
+                  d.tankName || d.destinationTank || 'Tank 1',
+                  formatLiters(d.totalLitersReceived || 0),
+                  `PKR ${Number(rate).toFixed(2)}`,
+                  formatCurrency(d.totalPurchaseAmount || 0),
+                ];
+              })
+            : [['No Deliveries Recorded', '-', '-', '0 L', 'PKR 0.00', 'PKR 0']],
+        },
+        {
+          title: 'Monthly Delivery Summary',
+          summaryCards: [
+            { label: 'Total Super Petrol Delivered', value: formatLiters(petrolLiters) },
+            { label: 'Total High-Speed Diesel Delivered', value: formatLiters(dieselLiters) },
+            { label: 'Total Excellium High-Octane Delivered', value: formatLiters(excelliumLiters) },
+            { label: 'Total Purchase Cost', value: formatCurrency(totalCost) },
+          ],
+          headers: ['Fuel Category', 'Total Volume Delivered (L)', 'Total Purchase Cost (PKR)'],
+          rows: [
+            ['Total Super Petrol Delivered', formatLiters(petrolLiters), '-'],
+            ['Total High-Speed Diesel Delivered', formatLiters(dieselLiters), '-'],
+            ['Total Excellium High-Octane Delivered', formatLiters(excelliumLiters), '-'],
+            ['TOTAL PURCHASE COST', formatLiters(petrolLiters + dieselLiters + excelliumLiters), formatCurrency(totalCost)],
+          ],
+        },
+        {
+          title: 'Fuel Dip & Shortage Summary',
+          summaryCards: [
+            { label: 'Total Monthly Shortage', value: formatLiters(totalShortage) },
+            { label: 'Total Monthly Overage', value: formatLiters(totalOverage) },
+          ],
+          headers: ['Tank Name', 'Physical Dip Reading', 'Calculated Stock', 'Difference', 'Shortage', 'Overage'],
+          rows: dipRows.length > 0 ? dipRows : [['No Tank Dip Records', '0 L', '0 L', '0 L', '0 L', '0 L']],
         },
       ];
-      generateProfessionalPDF('Fuel Deliveries Report', label, sections, 'Fuel_Deliveries_Report');
+      generateProfessionalPDF('Fuel Delivery Report', label, sections, 'Fuel_Delivery_Report');
       break;
     }
 
     case 'TANKS':
     case 'TANK_STOCK': {
       const tanks = appState.tanks || [];
-      const totalCap = tanks.reduce((sum: number, t: any) => sum + t.capacity, 0);
-      const totalStock = tanks.reduce((sum: number, t: any) => sum + t.currentFuel, 0);
+      const fuelSales = (appState.fuelSales || []).filter((s: any) => isDateInRange(s.date, range));
+      const deliveries = (appState.deliveries || []).filter((d: any) => isDateInRange(d.deliveryDate, range));
+
+      const rows = tanks.map((t: any) => {
+        const openingStock = Number(t.openingStock ?? t.currentFuel ?? 0);
+
+        const tDeliveries = deliveries.filter((d: any) => d.destinationTank === t.tankName || d.tankName === t.tankName || d.tankId === t.id);
+        const fuelRec = tDeliveries.reduce((sum: number, d: any) => sum + (d.totalLitersReceived || 0), 0);
+
+        const tSales = fuelSales.filter((s: any) => s.tankName === t.tankName || s.tankId === t.id);
+        const fuelSold = tSales.reduce((sum: number, s: any) => sum + (s.quantityLiters || 0), 0);
+
+        const closingStock = Math.max(0, openingStock + fuelRec - fuelSold);
+
+        return [
+          t.tankName || 'Tank',
+          t.fuelType || 'Fuel',
+          formatLiters(openingStock),
+          formatLiters(fuelRec),
+          formatLiters(fuelSold),
+          formatLiters(closingStock),
+        ];
+      });
+
+      const totalOpening = tanks.reduce((acc: number, t: any) => acc + Number(t.openingStock ?? t.currentFuel ?? 0), 0);
+      const totalDelivered = deliveries.reduce((acc: number, d: any) => acc + (d.totalLitersReceived || 0), 0);
+      const totalSold = fuelSales.reduce((acc: number, s: any) => acc + (s.quantityLiters || 0), 0);
+      const totalClosing = Math.max(0, totalOpening + totalDelivered - totalSold);
 
       const sections: PDFSection[] = [
         {
-          title: 'Underground Tank Stock Audit',
+          title: 'Tank Stock & Fuel Balance Audit',
           summaryCards: [
-            { label: 'Total Underground Tanks', value: `${tanks.length}` },
-            { label: 'Total Storage Capacity', value: formatLiters(totalCap) },
-            { label: 'Current Fuel Level', value: formatLiters(totalStock) },
+            { label: 'Opening Stock', value: formatLiters(totalOpening) },
+            { label: 'Fuel Delivered During Period', value: formatLiters(totalDelivered) },
+            { label: 'Fuel Sold During Period', value: formatLiters(totalSold) },
+            { label: 'Closing Stock', value: formatLiters(totalClosing) },
           ],
-          headers: ['Tank Name', 'Fuel Product', 'Capacity', 'Current Fuel', 'Stock %', 'Status'],
-          rows: tanks.map((t: any) => {
-            const pct = Math.round((t.currentFuel / t.capacity) * 100);
-            return [
-              t.tankName,
-              t.fuelType,
-              formatLiters(t.capacity),
-              formatLiters(t.currentFuel),
-              `${pct}%`,
-              t.currentFuel <= t.lowStockThreshold ? '⚠️ LOW STOCK' : '🟢 Optimal',
-            ];
-          }),
+          headers: ['Tank Name', 'Fuel Type', 'Opening Stock', 'Fuel Delivered', 'Fuel Sold', 'Closing Stock'],
+          rows: rows.length > 0 ? rows : [['No Tanks Configured', '-', '0 L', '0 L', '0 L', '0 L']],
         },
       ];
-      generateProfessionalPDF('Tank Management & Stock Report', label, sections, 'Tank_Management_Report');
+      generateProfessionalPDF('Tank Management Report', label, sections, 'Tank_Management_Report');
       break;
     }
 
@@ -292,81 +338,99 @@ export const exportModulePDF = (
     }
 
     case 'LUBRICANTS': {
+      const lubeSales = (appState.dailySalesEntries || []).filter((s: any) => s.section === 'Lubricants' && isDateInRange(s.date, range));
       const lubricants = appState.lubricants || [];
-      const totalStockVal = lubricants.reduce(
-        (sum: number, l: any) => sum + (l.remainingStock || 0) * (l.sellingPrice || 0),
-        0
-      );
+      const totalSaleAmount = lubeSales.reduce((sum: number, s: any) => sum + (s.totalSales || 0), 0);
+
+      const rows = lubeSales.map((s: any) => [
+        formatDate(s.date),
+        s.productName || s.notes || 'Engine Oil / Lubricant',
+        `${s.quantitySold || 1} Units`,
+        formatCurrency(s.totalSales || 0),
+      ]);
 
       const sections: PDFSection[] = [
         {
-          title: 'Lubricant & Engine Oil Inventory Report',
+          title: 'Lubricant Sales Log',
           summaryCards: [
-            { label: 'Total Lubricant SKUs', value: `${lubricants.length}` },
-            { label: 'Current Stock Valuation', value: formatCurrency(totalStockVal) },
+            { label: 'Total Sales Transactions', value: `${lubeSales.length}` },
+            { label: 'Monthly Total Sale Amount', value: formatCurrency(totalSaleAmount) },
           ],
-          headers: ['Product Name', 'Category', 'Initial Stock', 'Remaining Stock', 'Selling Price', 'Status'],
+          headers: ['Date', 'Product', 'Quantity Sold', 'Total Sale Amount'],
+          rows: rows.length > 0 ? rows : [['No Sales Recorded', '-', '0 Units', 'PKR 0']],
+        },
+        {
+          title: 'Lubricant Inventory Summary',
+          headers: ['Product Name', 'Remaining Stock', 'Selling Price'],
           rows: lubricants.map((l: any) => [
             l.productName,
-            l.category,
-            `${l.stockIn || 0} Units`,
             `${l.remainingStock || 0} Units`,
             formatCurrency(l.sellingPrice || 0),
-            (l.remainingStock || 0) <= (l.lowStockAlert || 5) ? '⚠️ LOW STOCK' : '🟢 Available',
           ]),
         },
       ];
-      generateProfessionalPDF('Lubricant Inventory Report', label, sections, 'Lubricants_Report');
+      generateProfessionalPDF('Lubricant Report', label, sections, 'Lubricant_Report');
       break;
     }
 
     case 'WORKERS': {
       const workers = appState.workers || [];
+      const salaries = appState.salaries || [];
 
       const sections: PDFSection[] = [
         {
-          title: 'Employee / Worker Profiles Directory',
+          title: 'Employee Report Directory',
           summaryCards: [
-            { label: 'Total Workers', value: `${workers.length}` },
-            { label: 'Active Workers', value: `${workers.filter((w: any) => w.status === 'Active').length}` },
+            { label: 'Total Employees', value: `${workers.length}` },
           ],
-          headers: ['Worker Name', 'Designation / Role', 'Phone Number', 'Basic Salary', 'Joining Date', 'Status'],
-          rows: workers.map((w: any) => [
-            w.name,
-            w.designation,
-            w.phone || 'N/A',
-            formatCurrency(w.basicSalary || 0),
-            w.joiningDate || 'N/A',
-            w.status || 'Active',
-          ]),
+          headers: ['Worker Name', 'Monthly Salary', 'Salary Paid', 'Advance', 'Pending Salary'],
+          rows: workers.map((w: any) => {
+            const sal = salaries.find((s: any) => s.workerId === w.id);
+            const mSal = w.basicSalary || w.monthlySalary || sal?.monthlySalary || 0;
+            const paid = sal?.salaryPaid || 0;
+            const adv = sal?.totalAdvance || 0;
+            const pending = sal?.pendingSalary !== undefined ? sal.pendingSalary : Math.max(0, mSal - paid);
+
+            return [
+              w.name,
+              formatCurrency(mSal),
+              formatCurrency(paid),
+              formatCurrency(adv),
+              formatCurrency(pending),
+            ];
+          }),
         },
       ];
-      generateProfessionalPDF('Employee Management Report', label, sections, 'Employee_Report');
+      generateProfessionalPDF('Employee Report', label, sections, 'Employee_Report');
       break;
     }
 
     case 'ATTENDANCE': {
-      const attendance = (appState.attendanceLogs || []).filter((a: any) => isDateInRange(a.date, range));
+      const workers = appState.workers || [];
+      const attendance = appState.attendanceLogs || appState.attendance || [];
+
+      const rows = workers.map((w: any) => {
+        const wLogs = attendance.filter((a: any) => (a.workerId === w.id || a.workerName === w.name) && isDateInRange(a.date, range));
+        const presentDays = wLogs.filter((a: any) => a.status === 'Present').length;
+        const absentDays = wLogs.filter((a: any) => a.status === 'Absent').length;
+        const leaveDays = wLogs.filter((a: any) => a.status === 'Leave').length;
+
+        return [
+          w.name,
+          `${presentDays} Days`,
+          `${absentDays} Days`,
+          `${leaveDays} Days`,
+        ];
+      });
 
       const sections: PDFSection[] = [
         {
-          title: 'Worker Attendance Register',
-          summaryCards: [
-            { label: 'Logged Entries', value: `${attendance.length}` },
-            { label: 'Present Count', value: `${attendance.filter((a: any) => a.status === 'Present').length}` },
-            { label: 'Absent Count', value: `${attendance.filter((a: any) => a.status === 'Absent').length}` },
-          ],
-          headers: ['Date', 'Worker Name', 'Attendance Status', 'Shift', 'Overtime Hours'],
-          rows: attendance.map((a: any) => [
-            a.date,
-            a.workerName || 'Worker',
-            a.status,
-            a.shift || 'Day',
-            a.overtimeHours ? `${a.overtimeHours} hrs` : '-',
-          ]),
+          title: 'Employee Attendance Summary Report',
+          headers: ['Worker Name', 'Present Days', 'Absent Days', 'Leave Days'],
+          rows: rows.length > 0 ? rows : [['No Employees Registered', '0 Days', '0 Days', '0 Days']],
         },
       ];
-      generateProfessionalPDF('Attendance Log Report', label, sections, 'Attendance_Report');
+      generateProfessionalPDF('Attendance Report', label, sections, 'Attendance_Report');
       break;
     }
 
@@ -454,29 +518,105 @@ export const exportModulePDF = (
       break;
     }
 
+    case 'CREDIT_CUSTOMERS': {
+      const customers = appState.creditCustomers || [];
+      const txs = (appState.creditTransactions || []).filter((t: any) => isDateInRange(t.date, range));
+
+      const sections: PDFSection[] = [];
+
+      // Overall Summary Section
+      const totalCreditGiven = txs.filter((t: any) => t.type === 'CREDIT' || t.creditAmount > 0).reduce((s: number, t: any) => s + (t.creditAmount || t.amount || 0), 0);
+      const totalPaymentsRec = txs.filter((t: any) => t.type === 'PAYMENT' || t.paymentAmount > 0).reduce((s: number, t: any) => s + (t.paymentAmount || t.amount || 0), 0);
+      const totalOutstanding = customers.reduce((s: number, c: any) => s + (c.currentBalance || c.balance || 0), 0);
+
+      sections.push({
+        title: 'Credit Customers Ledger Overview',
+        summaryCards: [
+          { label: 'Total Credit Customers', value: `${customers.length}` },
+          { label: 'Total Credit Given', value: formatCurrency(totalCreditGiven) },
+          { label: 'Total Payments Received', value: formatCurrency(totalPaymentsRec) },
+          { label: 'Total Outstanding Balance', value: formatCurrency(totalOutstanding) },
+        ],
+        headers: ['Customer Name', 'Total Credit Given', 'Total Payments Received', 'Outstanding Balance'],
+        rows: customers.map((c: any) => {
+          const cTxs = txs.filter((t: any) => t.customerId === c.id || t.customerName === c.name);
+          const cGiven = cTxs.filter((t: any) => t.type === 'CREDIT' || t.creditAmount > 0).reduce((s: number, t: any) => s + (t.creditAmount || t.amount || 0), 0);
+          const cPaid = cTxs.filter((t: any) => t.type === 'PAYMENT' || t.paymentAmount > 0).reduce((s: number, t: any) => s + (t.paymentAmount || t.amount || 0), 0);
+          const bal = c.currentBalance !== undefined ? c.currentBalance : (c.balance || cGiven - cPaid);
+
+          return [
+            c.name,
+            formatCurrency(cGiven),
+            formatCurrency(cPaid),
+            formatCurrency(bal),
+          ];
+        }),
+      });
+
+      // Individual Customer Detailed Ledgers
+      customers.forEach((c: any) => {
+        const cTxs = (appState.creditTransactions || [])
+          .filter((t: any) => (t.customerId === c.id || t.customerName === c.name) && isDateInRange(t.date, range))
+          .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        const cGiven = cTxs.filter((t: any) => t.type === 'CREDIT' || t.creditAmount > 0).reduce((s: number, t: any) => s + (t.creditAmount || t.amount || 0), 0);
+        const cPaid = cTxs.filter((t: any) => t.type === 'PAYMENT' || t.paymentAmount > 0).reduce((s: number, t: any) => s + (t.paymentAmount || t.amount || 0), 0);
+        const currentBal = c.currentBalance !== undefined ? c.currentBalance : (c.balance || cGiven - cPaid);
+
+        let runningBal = 0;
+        const txRows = cTxs.map((t: any) => {
+          const isCredit = t.type === 'CREDIT' || (t.creditAmount && t.creditAmount > 0);
+          const creditAdded = isCredit ? (t.creditAmount || t.amount || 0) : 0;
+          const paymentRec = !isCredit ? (t.paymentAmount || t.amount || 0) : 0;
+          runningBal = runningBal + creditAdded - paymentRec;
+
+          return [
+            formatDate(t.date),
+            isCredit ? 'Credit Added' : 'Payment Received',
+            creditAdded > 0 ? formatCurrency(creditAdded) : '-',
+            paymentRec > 0 ? formatCurrency(paymentRec) : '-',
+            formatCurrency(runningBal),
+          ];
+        });
+
+        sections.push({
+          title: `Customer Ledger: ${c.name}`,
+          summaryCards: [
+            { label: 'Customer Name', value: c.name },
+            { label: 'Total Credit Given', value: formatCurrency(cGiven) },
+            { label: 'Total Payments Received', value: formatCurrency(cPaid) },
+            { label: 'Outstanding Balance', value: formatCurrency(currentBal) },
+          ],
+          headers: ['Date', 'Transaction Type', 'Credit Added', 'Payment Received', 'Running Balance'],
+          rows: txRows.length > 0 ? txRows : [['No Transactions', '-', '-', '-', formatCurrency(currentBal)]],
+        });
+      });
+
+      generateProfessionalPDF('Credit Customer Report', label, sections, 'Credit_Customer_Report');
+      break;
+    }
+
     case 'CREDIT_CARD': {
       const ccSales = (appState.creditCardSales || []).filter((c: any) => isDateInRange(c.date, range));
       const totalCC = ccSales.reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
 
       const sections: PDFSection[] = [
         {
-          title: 'POS Credit Card Transactions',
+          title: 'POS Credit Card Sales Log',
           summaryCards: [
-            { label: 'Card Receipts Logged', value: `${ccSales.length}` },
-            { label: 'Total Credit Card Revenue', value: formatCurrency(totalCC) },
+            { label: 'Card Transactions', value: `${ccSales.length}` },
+            { label: 'Monthly Total Revenue', value: formatCurrency(totalCC) },
           ],
-          headers: ['Date', 'Time', 'Terminal ID', 'Customer Name', 'Receipt / Slip #', 'Amount'],
-          rows: ccSales.map((c: any) => [
-            c.date,
-            c.time || '12:00 PM',
-            c.terminalId || 'POS-01',
-            c.customerName || 'Walk-in',
-            c.receiptNo || 'SLIP-01',
-            formatCurrency(c.amount || 0),
-          ]),
+          headers: ['Date', 'Amount'],
+          rows: ccSales.length > 0
+            ? ccSales.map((c: any) => [
+                formatDate(c.date),
+                formatCurrency(c.amount || 0),
+              ])
+            : [['No Card Transactions', 'PKR 0']],
         },
       ];
-      generateProfessionalPDF('Credit Card Sales Report', label, sections, 'Credit_Card_Report');
+      generateProfessionalPDF('Credit Card Report', label, sections, 'Credit_Card_Report');
       break;
     }
 
@@ -486,75 +626,199 @@ export const exportModulePDF = (
 
       const sections: PDFSection[] = [
         {
-          title: 'Infini Fleet Card Transactions Log',
+          title: 'Infinity Fleet Card Sales Log',
           summaryCards: [
-            { label: 'Fleet Receipts Logged', value: `${infiniSales.length}` },
-            { label: 'Total Fleet Sales Revenue', value: formatCurrency(totalInfini) },
+            { label: 'Fleet Transactions', value: `${infiniSales.length}` },
+            { label: 'Monthly Total Revenue', value: formatCurrency(totalInfini) },
           ],
-          headers: ['Date', 'Card #', 'Fleet / Company', 'Vehicle #', 'Fuel Liters', 'Total Amount'],
-          rows: infiniSales.map((i: any) => [
-            i.date,
-            i.cardNumber || 'INF-00',
-            i.fleetName || 'Corporate Fleet',
-            i.vehicleNumber || 'N/A',
-            formatLiters(i.liters || 0),
-            formatCurrency(i.amount || 0),
-          ]),
+          headers: ['Date', 'Amount'],
+          rows: infiniSales.length > 0
+            ? infiniSales.map((i: any) => [
+                formatDate(i.date),
+                formatCurrency(i.amount || 0),
+              ])
+            : [['No Infinity Card Transactions', 'PKR 0']],
         },
       ];
-      generateProfessionalPDF('Infini Card Sales Report', label, sections, 'Infini_Card_Report');
+      generateProfessionalPDF('Infinity Card Report', label, sections, 'Infinity_Card_Report');
       break;
     }
 
     case 'BANK': {
       const txs = (appState.bankTransactions || []).filter((t: any) => isDateInRange(t.date, range));
       const bankAccounts = appState.bankAccounts || [];
-      const totalBal = bankAccounts.reduce((sum: number, b: any) => sum + b.currentBalance, 0);
+      
+      let runningBal = bankAccounts.reduce((sum: number, b: any) => sum + (b.openingBalance || b.currentBalance || 0), 0);
+
+      const rows = txs.map((t: any) => {
+        const deposit = t.type === 'DEPOSIT' || t.amount > 0 ? Math.abs(t.amount) : 0;
+        const withdrawal = t.type === 'WITHDRAWAL' || t.amount < 0 ? Math.abs(t.amount) : 0;
+        runningBal = runningBal + deposit - withdrawal;
+
+        return [
+          formatDate(t.date),
+          deposit > 0 ? formatCurrency(deposit) : '-',
+          withdrawal > 0 ? formatCurrency(withdrawal) : '-',
+          formatCurrency(runningBal),
+        ];
+      });
 
       const sections: PDFSection[] = [
         {
-          title: 'Bank Accounts & Transactions Statement',
+          title: 'Bank Statement Log',
           summaryCards: [
             { label: 'Active Bank Accounts', value: `${bankAccounts.length}` },
-            { label: 'Combined Bank Balance', value: formatCurrency(totalBal) },
+            { label: 'Current Closing Balance', value: formatCurrency(runningBal) },
           ],
-          headers: ['Date', 'Bank Name', 'Type', 'Amount', 'Reference #', 'Notes'],
-          rows: txs.map((t: any) => [
-            t.date,
-            t.bankName || 'Bank',
-            t.type,
-            formatCurrency(t.amount || 0),
-            t.referenceNumber || 'REF-00',
-            t.notes || '-',
-          ]),
+          headers: ['Date', 'Deposit', 'Withdrawal', 'Closing Balance'],
+          rows: rows.length > 0 ? rows : [['No Transactions', '-', '-', formatCurrency(runningBal)]],
         },
       ];
-      generateProfessionalPDF('Bank Management Statement', label, sections, 'Bank_Transactions_Report');
+      generateProfessionalPDF('Bank Report', label, sections, 'Bank_Report');
       break;
     }
 
     case 'EXPENSES': {
-      const expenses = (appState.expenses || []).filter((e: any) => isDateInRange(e.date, range));
+      // Exclude fuel purchase invoices
+      const expenses = (appState.expenses || []).filter(
+        (e: any) => isDateInRange(e.date, range) && e.category !== 'Fuel Purchase' && !e.title?.toLowerCase().includes('fuel delivery')
+      );
       const totalExp = expenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+
+      // Category Totals
+      const catMap: Record<string, number> = {};
+      expenses.forEach((e: any) => {
+        const cat = e.category || 'General';
+        catMap[cat] = (catMap[cat] || 0) + (e.amount || 0);
+      });
+
+      const catRows = Object.entries(catMap).map(([cat, amt]) => [cat, formatCurrency(amt)]);
 
       const sections: PDFSection[] = [
         {
-          title: 'Station Expenses & Operating Vouchers',
+          title: 'General Business Expenses Log',
           summaryCards: [
-            { label: 'Vouchers Logged', value: `${expenses.length}` },
-            { label: 'Total Expenses Paid', value: formatCurrency(totalExp) },
+            { label: 'Total Expense Vouchers', value: `${expenses.length}` },
+            { label: 'Overall Expense Total', value: formatCurrency(totalExp) },
           ],
-          headers: ['Date', 'Title', 'Category', 'Amount', 'Description'],
-          rows: expenses.map((e: any) => [
-            e.date,
-            e.title,
-            e.category || 'General',
-            formatCurrency(e.amount || 0),
-            e.description || e.notes || '-',
-          ]),
+          headers: ['Date', 'Expense Category', 'Description', 'Amount'],
+          rows: expenses.length > 0
+            ? expenses.map((e: any) => [
+                formatDate(e.date),
+                e.category || 'General',
+                e.description || e.title || e.notes || '-',
+                formatCurrency(e.amount || 0),
+              ])
+            : [['No Expenses Logged', '-', '-', 'PKR 0']],
+        },
+        {
+          title: 'Category Totals Summary',
+          headers: ['Expense Category', 'Total Amount (PKR)'],
+          rows: catRows.length > 0 ? catRows : [['No Expense Categories', 'PKR 0']],
         },
       ];
-      generateProfessionalPDF('Expenses Statement Report', label, sections, 'Expenses_Report');
+      generateProfessionalPDF('Expense Report', label, sections, 'Expense_Report');
+      break;
+    }
+
+    case 'CAR_WASH': {
+      const washes = (appState.carWashServices || []).filter((c: any) => isDateInRange(c.date || c.dateTime?.slice(0, 10), range));
+      const totalRev = washes.reduce((sum: number, c: any) => sum + (c.serviceFee || c.amount || 0), 0);
+
+      const sections: PDFSection[] = [
+        {
+          title: 'Car Wash Sales Log',
+          summaryCards: [
+            { label: 'Vehicles Serviced', value: `${washes.length}` },
+            { label: 'Monthly Total Revenue', value: formatCurrency(totalRev) },
+          ],
+          headers: ['Date', 'Package / Service', 'Vehicle #', 'Amount'],
+          rows: washes.length > 0
+            ? washes.map((c: any) => [
+                formatDate(c.date || c.dateTime?.slice(0, 10)),
+                c.serviceType || c.packageName || 'Full Car Wash',
+                c.vehicleNumber || c.plateNo || 'N/A',
+                formatCurrency(c.serviceFee || c.amount || 0),
+              ])
+            : [['No Car Wash Records', '-', '-', 'PKR 0']],
+        },
+      ];
+      generateProfessionalPDF('Car Wash Report', label, sections, 'Car_Wash_Report');
+      break;
+    }
+
+    case 'TYRE_SHOP': {
+      const tireSales = (appState.tyreServices || appState.tyreShopSales || []).filter((t: any) => isDateInRange(t.date, range));
+      const totalRev = tireSales.reduce((sum: number, t: any) => sum + (t.amount || t.price || 0), 0);
+
+      const sections: PDFSection[] = [
+        {
+          title: 'Tire Shop Sales Log',
+          summaryCards: [
+            { label: 'Services / Products Sold', value: `${tireSales.length}` },
+            { label: 'Monthly Total Revenue', value: formatCurrency(totalRev) },
+          ],
+          headers: ['Date', 'Service / Product', 'Amount'],
+          rows: tireSales.length > 0
+            ? tireSales.map((t: any) => [
+                formatDate(t.date),
+                t.serviceName || t.productName || t.notes || 'Tire Service / Repair',
+                formatCurrency(t.amount || t.price || 0),
+              ])
+            : [['No Tire Shop Records', '-', 'PKR 0']],
+        },
+      ];
+      generateProfessionalPDF('Tire Shop Report', label, sections, 'Tire_Shop_Report');
+      break;
+    }
+
+    case 'TUCK_SHOP': {
+      const martSales = (appState.tuckShopSales || appState.martSales || []).filter((m: any) => isDateInRange(m.date, range));
+      const totalRev = martSales.reduce((sum: number, m: any) => sum + (m.amount || m.totalPrice || 0), 0);
+
+      const sections: PDFSection[] = [
+        {
+          title: 'Tuck Shop / Mart Sales Log',
+          summaryCards: [
+            { label: 'Sales Transactions', value: `${martSales.length}` },
+            { label: 'Monthly Total Revenue', value: formatCurrency(totalRev) },
+          ],
+          headers: ['Date', 'Item / Description', 'Amount'],
+          rows: martSales.length > 0
+            ? martSales.map((m: any) => [
+                formatDate(m.date),
+                m.itemName || m.description || m.notes || 'Mart Items Sale',
+                formatCurrency(m.amount || m.totalPrice || 0),
+              ])
+            : [['No Tuck Shop Records', '-', 'PKR 0']],
+        },
+      ];
+      generateProfessionalPDF('Tuck Shop Report', label, sections, 'Tuck_Shop_Report');
+      break;
+    }
+
+    case 'RESTAURANT': {
+      const restSales = (appState.restaurantSales || []).filter((r: any) => isDateInRange(r.date, range));
+      const totalRev = restSales.reduce((sum: number, r: any) => sum + (r.amount || r.totalBill || 0), 0);
+
+      const sections: PDFSection[] = [
+        {
+          title: 'Restaurant Sales Log',
+          summaryCards: [
+            { label: 'Customer Orders', value: `${restSales.length}` },
+            { label: 'Monthly Total Revenue', value: formatCurrency(totalRev) },
+          ],
+          headers: ['Date', 'Order / Items', 'Amount'],
+          rows: restSales.length > 0
+            ? restSales.map((r: any) => [
+                formatDate(r.date),
+                r.orderItems || r.dishName || r.notes || 'Food Order',
+                formatCurrency(r.amount || r.totalBill || 0),
+              ])
+            : [['No Restaurant Records', '-', 'PKR 0']],
+        },
+      ];
+      generateProfessionalPDF('Restaurant Report', label, sections, 'Restaurant_Report');
       break;
     }
 
@@ -942,23 +1206,32 @@ export const exportModulePDF = (
           ],
         },
         {
-          title: 'UNDERGROUND TANK STORAGE & REMAINING STOCK',
+          title: 'UNDERGROUND TANK STORAGE & REMAINING STOCK AUDIT',
           summaryCards: [
-            { label: 'Total Fuel Tanks', value: `${tanks.length} Underground Tanks` },
-            { label: 'Total Tank Capacity', value: formatLiters(totalTankCapacity) },
-            { label: 'Current Tank Stock', value: formatLiters(totalCurrentTankStock) },
-            { label: 'Remaining Tank Stock', value: formatLiters(totalCurrentTankStock) },
+            { label: 'Total Opening Stock', value: formatLiters(tanks.reduce((s: number, t: any) => s + Number(t.openingStock ?? t.currentFuel ?? 0), 0)) },
+            { label: 'Fuel Delivered During Period', value: formatLiters(totalFuelDeliveredLiters) },
+            { label: 'Fuel Sold During Period', value: formatLiters(totalFuelLiters) },
+            { label: 'Total Closing Stock', value: formatLiters(totalCurrentTankStock) },
           ],
-          headers: ['Tank Name', 'Fuel Type', 'Capacity', 'Current Fuel Stock', 'Stock Fullness (%)'],
+          headers: ['Tank Name', 'Fuel Type', 'Opening Stock', 'Fuel Delivered', 'Fuel Sold', 'Closing Stock'],
           rows: tanks.length > 0
-            ? tanks.map((t: any) => [
-                t.tankName || 'Tank',
-                t.fuelType,
-                formatLiters(t.capacity || 0),
-                formatLiters(t.currentFuel || 0),
-                `${Math.round(((t.currentFuel || 0) / (t.capacity || 1)) * 100)}%`,
-              ])
-            : [['No Tank Data', '-', '0 L', '0 L', '0%']],
+            ? tanks.map((t: any) => {
+                const tDeliveries = deliveries.filter((d: any) => d.destinationTank === t.tankName || d.tankName === t.tankName || d.tankId === t.id);
+                const fuelRec = tDeliveries.reduce((sum: number, d: any) => sum + (d.totalLitersReceived || 0), 0);
+                const tSales = fuelSales.filter((s: any) => s.tankName === t.tankName || s.tankId === t.id);
+                const fuelSold = tSales.reduce((sum: number, s: any) => sum + (s.quantityLiters || 0), 0);
+                const opStock = Number(t.openingStock ?? t.currentFuel ?? 0);
+                const clStock = Math.max(0, opStock + fuelRec - fuelSold);
+                return [
+                  t.tankName || 'Tank',
+                  t.fuelType,
+                  formatLiters(opStock),
+                  formatLiters(fuelRec),
+                  formatLiters(fuelSold),
+                  formatLiters(clStock),
+                ];
+              })
+            : [['No Tank Data', '-', '0 L', '0 L', '0 L', '0 L']],
         },
         {
           title: 'SUB-BUSINESS REVENUE (LUBRICANTS, CAR WASH, TIRE SHOP, TUCK SHOP, RESTAURANT)',

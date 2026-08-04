@@ -121,7 +121,7 @@ export const SettingsView: React.FC = () => {
           }`}
         >
           <FileText className="w-4 h-4" />
-          <span>📄 Reports & PDF Center</span>
+          <span>📄 Reports & Analytics → PDF Downloads</span>
         </button>
 
         {isAdmin && (

@@ -1242,25 +1242,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUdhaarCustomers(prev =>
       prev.map(c => {
         if (c.id === customerId) {
-          const totalCredit = type === 'CREDIT_PURCHASE' ? c.totalCredit + amount : c.totalCredit;
-          const paymentReceived = type === 'PAYMENT_RECEIVED' ? c.paymentReceived + amount : c.paymentReceived;
-          const remaining = totalCredit - paymentReceived;
+          const numAmt = Number(amount || 0);
           const newTx: UdhaarTransaction = {
             id: `ut-${Date.now()}`,
             date: date || new Date().toISOString().slice(0, 10),
             time: time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             type,
-            amount,
-            description,
+            amount: numAmt,
+            description: description || (type === 'CREDIT_PURCHASE' ? 'Fuel Credit Purchase' : 'Payment Received'),
             vehicleNumber,
-            runningBalance: remaining,
           };
+          const allTxs = [newTx, ...(c.transactions || [])];
+          let totalCredit = 0;
+          let paymentReceived = 0;
+          allTxs.forEach(t => {
+            const amt = Number(t.amount || 0);
+            if (t.type === 'CREDIT_PURCHASE' || (t.type as any) === 'CREDIT') totalCredit += amt;
+            else if (t.type === 'PAYMENT_RECEIVED' || (t.type as any) === 'PAYMENT') paymentReceived += amt;
+          });
+          const remaining = totalCredit - paymentReceived;
           const updated = {
             ...c,
             totalCredit,
             paymentReceived,
             remainingBalance: remaining,
-            transactions: [newTx, ...c.transactions],
+            transactions: allTxs,
           };
           syncSaveDoc('udhaarCustomers', updated);
           return updated;
@@ -1274,12 +1280,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUdhaarCustomers(prev =>
       prev.map(c => {
         if (c.id === customerId) {
-          const newTxs = c.transactions.map(t => (t.id === txId ? { ...t, ...updatedTx } : t));
+          const newTxs = (c.transactions || []).map(t => (t.id === txId ? { ...t, ...updatedTx, amount: Number(updatedTx.amount !== undefined ? updatedTx.amount : t.amount) } : t));
           let totalCredit = 0;
           let paymentReceived = 0;
           newTxs.forEach(t => {
-            if (t.type === 'CREDIT_PURCHASE') totalCredit += t.amount;
-            else if (t.type === 'PAYMENT_RECEIVED') paymentReceived += t.amount;
+            const amt = Number(t.amount || 0);
+            if (t.type === 'CREDIT_PURCHASE' || (t.type as any) === 'CREDIT') totalCredit += amt;
+            else if (t.type === 'PAYMENT_RECEIVED' || (t.type as any) === 'PAYMENT') paymentReceived += amt;
           });
           const remaining = totalCredit - paymentReceived;
           const updated = {
@@ -1302,11 +1309,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUdhaarCustomers(prev =>
       prev.map(c => {
         if (c.id === customerId) {
-          const targetTx = c.transactions.find(t => t.id === txId);
+          const targetTx = (c.transactions || []).find(t => t.id === txId);
           if (!targetTx) return c;
-          const newTxs = c.transactions.filter(t => t.id !== txId);
-          const totalCredit = targetTx.type === 'CREDIT_PURCHASE' ? Math.max(0, c.totalCredit - targetTx.amount) : c.totalCredit;
-          const paymentReceived = targetTx.type === 'PAYMENT_RECEIVED' ? Math.max(0, c.paymentReceived - targetTx.amount) : c.paymentReceived;
+          const newTxs = (c.transactions || []).filter(t => t.id !== txId);
+          let totalCredit = 0;
+          let paymentReceived = 0;
+          newTxs.forEach(t => {
+            const amt = Number(t.amount || 0);
+            if (t.type === 'CREDIT_PURCHASE' || (t.type as any) === 'CREDIT') totalCredit += amt;
+            else if (t.type === 'PAYMENT_RECEIVED' || (t.type as any) === 'PAYMENT') paymentReceived += amt;
+          });
           const remaining = totalCredit - paymentReceived;
           const updated = {
             ...c,
